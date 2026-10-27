@@ -1,6 +1,6 @@
 """Small deterministic baselines that can be replaced by learned policies."""
 
-from src.domain.insurance import CoverageChoice, InsuranceObservation, eligible_product
+from domain.insurance import CoverageChoice, InsuranceObservation, eligible_product
 
 
 def cheapest_affordable_coverage(observation: InsuranceObservation) -> tuple[CoverageChoice, ...]:

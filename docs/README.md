@@ -1,6 +1,6 @@
 # Insurance Land documentation
 
-Insurance Land is a Python simulation foundation for a market of people, homes, and decision-making agents. Factories build the initial population, an `Environment` connects its objects, and `src/main.py` advances the simulation through a sequence of periods.
+Insurance Land is a Python simulation foundation for a market of people, homes, and decision-making agents. Factories build the initial population, an `Environment` connects its objects, and `main.py` advances the simulation through a sequence of periods.
 
 Each person has an individual budget, a single-person household, and a `HouseAgent`. A home records its owner and its optional resident separately. Rent is a behavior of the house agent, with payment settlement handled by the economic model.
 
@@ -25,7 +25,7 @@ From the repository root:
 
 ```bash
 uv sync --locked
-uv run python -m src.main
+uv run python main.py
 ```
 
 The entry point creates a 4-by-4 grid with 16 people and three insurers, opens coverage, then runs three periods with disaster exposure. See [initial distributions](initial-distributions.md) for configuration and the explicit toy contract rules.

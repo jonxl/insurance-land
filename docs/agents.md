@@ -1,6 +1,6 @@
 # Agents and decision policies
 
-The controller classes are exported by [src/agents/__init__.py](../src/agents/__init__.py): `RLAgent`, `HouseAgent`, and `InsurancePlanAgent`.
+The controller classes are exported by [agents/__init__.py](../agents/__init__.py): `RLAgent`, `HouseAgent`, and `InsurancePlanAgent`.
 
 ## Inheritance and responsibility
 
@@ -29,7 +29,7 @@ Economic state belongs to domain records. Agent objects hold decision behavior a
 
 ## House observations
 
-`Observation` is a frozen dataclass in [base.py](../src/agents/base.py):
+`Observation` is a frozen dataclass in [base.py](../agents/base.py):
 
 | Field | Type | Meaning |
 | --- | --- | --- |
@@ -73,9 +73,9 @@ The default `HouseAgent.decide` calls `pay_rent`. Supplying a policy callable ma
 This policy deliberately waits, demonstrating how to replace the default decision behavior:
 
 ```python
-from src.agents import HouseAgent
-from src.agents.base import Action, Observation, Wait
-from src.factories import EnvironmentFactory, PopulationConfig, RegionConfig
+from agents import HouseAgent
+from agents.base import Action, Observation, Wait
+from factories import EnvironmentFactory, PopulationConfig, RegionConfig
 
 
 def wait_policy(observation: Observation) -> Action:
@@ -99,9 +99,9 @@ A subclass is appropriate when the controller has state or several related behav
 ```python
 from decimal import Decimal
 
-from src.agents import HouseAgent
-from src.agents.base import Action, Observation
-from src.factories import EnvironmentFactory, PopulationConfig, RegionConfig
+from agents import HouseAgent
+from agents.base import Action, Observation
+from factories import EnvironmentFactory, PopulationConfig, RegionConfig
 
 
 class RecordingHouseAgent(HouseAgent):
@@ -125,14 +125,14 @@ Construct a separate instance for every person. The environment verifies instanc
 
 ## Insurance policy interface
 
-[InsurancePlanAgent](../src/agents/insurance.py) wraps a required policy callable. The caller chooses the input and output types. Its `decide` method passes the observation to that callable and returns the result.
+[InsurancePlanAgent](../agents/insurance.py) wraps a required policy callable. The caller chooses the input and output types. Its `decide` method passes the observation to that callable and returns the result.
 
 The following standalone example uses a decimal expected cost as its input and a decimal quote as its output. The multiplier is illustrative policy logic supplied by the example:
 
 ```python
 from decimal import Decimal
 
-from src.agents import InsurancePlanAgent
+from agents import InsurancePlanAgent
 
 
 def quote_policy(expected_cost: Decimal) -> Decimal:

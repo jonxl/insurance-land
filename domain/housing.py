@@ -3,7 +3,7 @@ from dataclasses import replace
 from decimal import Decimal
 from types import MappingProxyType
 
-from src.domain.models import Entity, Home
+from domain.models import Entity, Home
 
 
 class HousingMarket:

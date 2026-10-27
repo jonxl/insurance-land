@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from src.factories import (
+from factories import (
     EnvironmentFactory,
     PopulationConfig,
     PopulationFactory,

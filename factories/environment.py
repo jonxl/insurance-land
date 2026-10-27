@@ -1,13 +1,13 @@
 from collections.abc import Callable, Mapping
 
-from src.agents.house import HouseAgent
-from src.agents.insurance import InsurancePlanAgent
-from src.domain.disasters import DisasterConfig
-from src.domain.insurance import Insurer, InsurerObservation, Offer
-from src.domain.models import Entity
-from src.environment import Environment, Scenario
-from src.factories.grid import GridPopulationConfig, GridPopulationFactory
-from src.factories.population import PopulationConfig, PopulationFactory
+from agents.house import HouseAgent
+from agents.insurance import InsurancePlanAgent
+from domain.disasters import DisasterConfig
+from domain.insurance import Insurer, InsurerObservation, Offer
+from domain.models import Entity
+from environment import Environment, Scenario
+from factories.grid import GridPopulationConfig, GridPopulationFactory
+from factories.population import PopulationConfig, PopulationFactory
 
 
 class EnvironmentFactory:

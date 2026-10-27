@@ -11,10 +11,10 @@ from decimal import Decimal
 from enum import StrEnum
 from types import MappingProxyType
 
-from src.domain.housing import HousingMarket
-from src.domain.models import Entity, Home
-from src.utils.validation.collections import index_by_id
-from src.utils.validation.money import validate_money
+from domain.housing import HousingMarket
+from domain.models import Entity, Home
+from utils.validation.collections import index_by_id
+from utils.validation.money import validate_money
 
 
 class Product(StrEnum):

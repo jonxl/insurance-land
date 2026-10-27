@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from src.utils.validation.money import validate_money
+from utils.validation.money import validate_money
 
 
 @dataclass(frozen=True, slots=True)

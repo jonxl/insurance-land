@@ -2,7 +2,7 @@
 
 This guide describes the base housing loop. With insurers configured, call `open_insurance()` before the first step. Configured disasters run after rent settlement, followed by claims; returned observations include these effects. See [initial distributions](initial-distributions.md) for the full grid experiment and timing rules.
 
-[Environment](../src/environment.py) connects the economic records to controllers and coordinates each simulation period. [src/main.py](../src/main.py) decides how many times to advance it.
+[Environment](../environment.py) connects the economic records to controllers and coordinates each simulation period. [main.py](../main.py) decides how many times to advance it.
 
 ## Assembly
 
@@ -124,8 +124,8 @@ In the next period, the tenant has 70 after income. The 100 payment returns `Fal
 This complete example advances a generated world with every person choosing to wait:
 
 ```python
-from src.agents.base import Wait
-from src.factories import EnvironmentFactory, PopulationConfig, RegionConfig
+from agents.base import Wait
+from factories import EnvironmentFactory, PopulationConfig, RegionConfig
 
 environment = EnvironmentFactory.create(
     PopulationConfig(regions=(RegionConfig(name="Coast", households=3),))

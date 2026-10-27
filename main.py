@@ -2,12 +2,12 @@
 
 from decimal import Decimal
 
-from src.agents.house import HouseAgent
-from src.agents.insurance import InsurancePlanAgent
-from src.agents.policies import cheapest_affordable_coverage
-from src.domain.disasters import DisasterConfig
-from src.domain.insurance import Insurer, InsurerObservation, Offer, Product
-from src.factories import EnvironmentFactory, GridPopulationConfig
+from agents.house import HouseAgent
+from agents.insurance import InsurancePlanAgent
+from agents.policies import cheapest_affordable_coverage
+from domain.disasters import DisasterConfig
+from domain.insurance import Insurer, InsurerObservation, Offer, Product
+from factories import EnvironmentFactory, GridPopulationConfig
 
 
 def quote_products(observation: InsurerObservation) -> tuple[Offer, ...]:

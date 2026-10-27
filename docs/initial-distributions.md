@@ -1,11 +1,11 @@
 # Initial distributions and insurance experiments
 
-The initial-distributions model now has a reusable implementation. Its records remain in `src/domain`, construction in `src/factories`, decisions in `src/agents`, and pure mathematical helpers in `src/utils/distributions.py`. It uses the standard library and `Decimal` money; no numerical or learning-library dependency is required.
+The initial-distributions model now has a reusable implementation. Its records remain in `domain`, construction in `factories`, decisions in `agents`, and pure mathematical helpers in `utils/distributions.py`. It uses the standard library and `Decimal` money; no numerical or learning-library dependency is required.
 
 Run the example from the repository root:
 
 ```bash
-uv run python -m src.main
+uv run python main.py
 ```
 
 The example creates a 4-by-4 grid, 16 people, and three insurers. Its fixed quoting and cheapest-affordable purchasing policies demonstrate the interfaces; they are not trained agents.
@@ -14,8 +14,8 @@ The example creates a 4-by-4 grid, 16 people, and three insurers. Its fixed quot
 
 ```python
 from decimal import Decimal
-from src.factories import EnvironmentFactory, GridPopulationConfig
-from src.utils.distributions import PowerLorenz
+from factories import EnvironmentFactory, GridPopulationConfig
+from utils.distributions import PowerLorenz
 
 config = GridPopulationConfig(
     rows=4,
@@ -59,7 +59,7 @@ Annual income is allocated once and stored as `Entity.annual_income`. `Entity.in
 ## Natural disasters
 
 ```python
-from src.domain.disasters import DisasterConfig
+from domain.disasters import DisasterConfig
 
 environment = EnvironmentFactory.create(
     config,
@@ -81,7 +81,7 @@ Disaster streams are derived from the global seed and period number. Rejected st
 
 ## Insurance opening and claims
 
-See `src/main.py` for a complete three-firm example. Supply `Insurer` records and one `InsurancePlanAgent[InsurerObservation, tuple[Offer, ...]]` per insurer to `EnvironmentFactory.create`. Each insurer policy receives immutable financial and housing observations and returns offers with globally unique IDs belonging to that firm.
+See `main.py` for a complete three-firm example. Supply `Insurer` records and one `InsurancePlanAgent[InsurerObservation, tuple[Offer, ...]]` per insurer to `EnvironmentFactory.create`. Each insurer policy receives immutable financial and housing observations and returns offers with globally unique IDs belonging to that firm.
 
 A `HouseAgent` accepts an `insurance_policy` callable that receives `InsuranceObservation` and returns `CoverageChoice(offer_id, home_id)` objects. The provided `cheapest_affordable_coverage` baseline buys the cheapest eligible offer for each home in ID order while respecting its upfront cash budget. It does not compare coverage quality. Without a purchasing policy, the default is to decline optional insurance.
 
@@ -108,7 +108,7 @@ The report left some timing and contract rules open. The explicit choices above 
 
 ```bash
 uv run pytest -q
-uv run ruff check src tests
-uv run ruff format --check src tests
+uv run ruff check
+uv run ruff format --check
 uv run mypy
 ```

@@ -1,7 +1,7 @@
 from collections.abc import Callable
 
-from src.agents.base import Action, Observation, PayRent, RLAgent, Wait
-from src.domain.insurance import CoverageChoice, InsuranceObservation
+from agents.base import Action, Observation, PayRent, RLAgent, Wait
+from domain.insurance import CoverageChoice, InsuranceObservation
 
 
 class HouseAgent(RLAgent[Observation, Action]):

@@ -4,7 +4,7 @@ from random import Random
 
 import pytest
 
-from src.utils.distributions import (
+from utils.distributions import (
     PowerLorenz,
     allocate_money,
     gaussian_price_field,
@@ -104,7 +104,7 @@ def test_invalid_poisson_rates(rate: float) -> None:
 
 
 def test_matching_respects_rank_and_preserves_one_to_one_assignment() -> None:
-    from src.utils.distributions import match_residences
+    from utils.distributions import match_residences
 
     incomes = [Decimal(10), Decimal(20), Decimal(30)]
     prices = [300.0, 100.0, 200.0]

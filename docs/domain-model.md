@@ -1,6 +1,6 @@
 # Domain model
 
-The economic records are defined in [src/domain/models.py](../src/domain/models.py), and state transitions are implemented by [HousingMarket](../src/domain/housing.py).
+The economic records are defined in [domain/models.py](../domain/models.py), and state transitions are implemented by [HousingMarket](../domain/housing.py).
 
 ## People: `Entity`
 
@@ -106,15 +106,13 @@ If cash is insufficient, settlement returns `False` and preserves both balances 
 ```python
 from decimal import Decimal
 
-from src.domain.housing import HousingMarket
-from src.domain.models import Entity, Home
+from domain.housing import HousingMarket
+from domain.models import Entity, Home
 
 market = HousingMarket()
 market.add_entity(Entity(id=1, cash=Decimal("500")))
 market.add_entity(Entity(id=2, cash=Decimal("1200")))
-market.add_home(
-    Home(id=1, region_id=1, owner_id=1, market_value=Decimal("250000"))
-)
+market.add_home(Home(id=1, region_id=1, owner_id=1, market_value=Decimal("250000")))
 market.move_in(1, 2, rent=Decimal("1000"))
 
 assert market.pay_rent(1)

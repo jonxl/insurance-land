@@ -2,13 +2,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from types import MappingProxyType
 
-from src.agents.base import Action, Observation, PayRent, Wait
-from src.agents.house import HouseAgent
-from src.agents.insurance import InsurancePlanAgent
-from src.domain.disasters import DisasterConfig, DisasterResult
-from src.domain.grid import GridSnapshot, grid_snapshot
-from src.domain.housing import HousingMarket
-from src.domain.insurance import (
+from agents.base import Action, Observation, PayRent, Wait
+from agents.house import HouseAgent
+from agents.insurance import InsurancePlanAgent
+from domain.disasters import DisasterConfig, DisasterResult
+from domain.grid import GridSnapshot, grid_snapshot
+from domain.housing import HousingMarket
+from domain.insurance import (
     Claim,
     Contract,
     CoverageChoice,
@@ -18,8 +18,8 @@ from src.domain.insurance import (
     InsurerObservation,
     Offer,
 )
-from src.domain.models import Entity, Home, Household, Region
-from src.utils.validation.collections import index_by_id
+from domain.models import Entity, Home, Household, Region
+from utils.validation.collections import index_by_id
 
 
 @dataclass(frozen=True, slots=True)

@@ -2,13 +2,13 @@ from decimal import Decimal
 
 import pytest
 
-from src.agents.house import HouseAgent
-from src.agents.insurance import InsurancePlanAgent
-from src.agents.policies import cheapest_affordable_coverage
-from src.domain.disasters import DisasterConfig
-from src.domain.insurance import CoverageChoice, Insurer, InsurerObservation, Offer, Product
-from src.environment import Environment
-from src.factories import EnvironmentFactory, GridPopulationConfig
+from agents.house import HouseAgent
+from agents.insurance import InsurancePlanAgent
+from agents.policies import cheapest_affordable_coverage
+from domain.disasters import DisasterConfig
+from domain.insurance import CoverageChoice, Insurer, InsurerObservation, Offer, Product
+from environment import Environment
+from factories import EnvironmentFactory, GridPopulationConfig
 
 
 def quote(observation: InsurerObservation) -> tuple[Offer, ...]:
@@ -137,9 +137,9 @@ def test_unaffordable_selection_is_rejected_atomically() -> None:
 def test_claim_failure_rolls_back_disasters_and_can_retry(monkeypatch: pytest.MonkeyPatch) -> None:
     from collections.abc import Sequence
 
-    from src.domain.housing import HousingMarket
-    from src.domain.insurance import Claim, InsuranceMarket
-    from src.domain.models import Home
+    from domain.housing import HousingMarket
+    from domain.insurance import Claim, InsuranceMarket
+    from domain.models import Home
 
     first = insured_environment()
     second = insured_environment()

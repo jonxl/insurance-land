@@ -6,22 +6,22 @@ The project uses uv to manage Python and development dependencies. Its Python re
 
 ```bash
 uv sync --locked
-uv run python -m src.main
+uv run python main.py
 ```
 
 `uv sync --locked` creates or synchronizes `.venv` using the checked-in [uv.lock](../uv.lock). The application uses Python's standard library; pytest, Ruff, and mypy are development dependencies.
 
-[pyproject.toml](../pyproject.toml) sets `package = false`. uv manages this repository as an application. The `src` directory is an importable Python package, and modules use imports such as `from src.factories import EnvironmentFactory`.
+[pyproject.toml](../pyproject.toml) sets `package = false`. uv manages this repository as an application. Application packages live at the repository root and use imports such as `from factories import EnvironmentFactory`.
 
-Run the entry point as a module from the repository root so that those imports resolve consistently:
+Run the entry point from the repository root:
 
 ```bash
-uv run python -m src.main
+uv run python main.py
 ```
 
 ## What the entry point does
 
-[src/main.py](../src/main.py) contains a `main()` function and the usual module entry guard. Importing the module defines the function; executing it starts the simulation.
+[main.py](../main.py) contains a `main()` function and the usual module entry guard. Importing the module defines the function; executing it starts the simulation.
 
 `main()` creates a seeded 4-by-4 grid with 16 people and three insurance firms. Lorenz curves assign incomes and home counts, spatial noise generates prices, and income-biased matching assigns residences. The example opens insurance coverage and runs three periods, reporting disasters, destroyed homes, and paid claims.
 
@@ -32,7 +32,7 @@ Policies are deterministic examples, not trained agents. The [initial-distributi
 This complete example can be run in a Python session started with `uv run python` from the repository root:
 
 ```python
-from src.factories import EnvironmentFactory, PopulationConfig, RegionConfig
+from factories import EnvironmentFactory, PopulationConfig, RegionConfig
 
 environment = EnvironmentFactory.create(
     PopulationConfig(
@@ -55,7 +55,7 @@ assert result.period == 1
 print(result.actions)
 ```
 
-Change the configuration in `src/main.py` to choose the main simulation's population, seed, balances, income, values, and rents. The loop determines how many periods run. The [factories guide](factories.md) covers the original region-based factory; the [initial-distributions guide](initial-distributions.md) covers the grid factory.
+Change the configuration in `main.py` to choose the main simulation's population, seed, balances, income, values, and rents. The loop determines how many periods run. The [factories guide](factories.md) covers the original region-based factory; the [initial-distributions guide](initial-distributions.md) covers the grid factory.
 
 ## Verification commands
 
@@ -66,4 +66,4 @@ uv run ruff format --check
 uv run mypy
 ```
 
-pytest checks behavior, Ruff checks lint and formatting rules, and mypy checks types in `src/` and `tests/`. See [development](development.md) for the test organization and coding conventions.
+pytest checks behavior, Ruff checks lint and formatting rules, and mypy checks types in the application modules and `tests/`. See [development](development.md) for the test organization and coding conventions.

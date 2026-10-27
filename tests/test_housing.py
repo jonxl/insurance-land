@@ -3,8 +3,8 @@ from decimal import Decimal
 
 import pytest
 
-from src.domain.housing import HousingMarket
-from src.domain.models import Entity, Home
+from domain.housing import HousingMarket
+from domain.models import Entity, Home
 
 
 @pytest.fixture

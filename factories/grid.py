@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from math import isfinite
 
-from src.domain.models import Entity, Home, Household, Region
-from src.environment import Scenario
-from src.utils.distributions import (
+from domain.models import Entity, Home, Household, Region
+from environment import Scenario
+from utils.distributions import (
     PowerLorenz,
     allocate_money,
     gaussian_price_field,
@@ -17,7 +17,7 @@ from src.utils.distributions import (
     round_counts,
     validate_shape,
 )
-from src.utils.validation.money import validate_money
+from utils.validation.money import validate_money
 
 
 @dataclass(frozen=True, slots=True)

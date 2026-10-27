@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from src.agents.base import RLAgent
+from agents.base import RLAgent
 
 
 class InsurancePlanAgent[ObservationT, ActionT](RLAgent[ObservationT, ActionT]):

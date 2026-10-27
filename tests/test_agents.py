@@ -1,8 +1,8 @@
 from decimal import Decimal
 
-from src.agents import HouseAgent, InsurancePlanAgent, RLAgent
-from src.agents.base import Observation, PayRent, Wait
-from src.domain.models import Entity, Home, Household, Region
+from agents import HouseAgent, InsurancePlanAgent, RLAgent
+from agents.base import Observation, PayRent, Wait
+from domain.models import Entity, Home, Household, Region
 
 
 def test_house_agent_exposes_rent_as_behavior() -> None:

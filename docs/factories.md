@@ -10,7 +10,7 @@ Factories turn a population description into connected simulation objects. They 
 | `EnvironmentFactory.create(config, agent_factory=...)` | `Environment` | Generate a scenario and attach agents |
 | `EnvironmentFactory.from_scenario(scenario, agent_factory=...)` | `Environment` | Attach agents to an explicit scenario |
 
-Import these classes from `src.factories`. `Scenario` is defined in `src.environment` and contains tuples named `regions`, `people`, `households`, and `homes`.
+Import these classes from `factories`. `Scenario` is defined in `environment` and contains tuples named `regions`, `people`, `households`, and `homes`.
 
 ## Region configuration
 
@@ -45,7 +45,7 @@ The owner-occupancy rate is a probability per occupied home, rather than an exac
 ```python
 from decimal import Decimal
 
-from src.factories import EnvironmentFactory, PopulationConfig, RegionConfig
+from factories import EnvironmentFactory, PopulationConfig, RegionConfig
 
 config = PopulationConfig(
     regions=(
@@ -86,9 +86,9 @@ Use `from_scenario` when exact ownership, residence, balances, or IDs matter:
 ```python
 from decimal import Decimal
 
-from src.domain.models import Entity, Home, Household, Region
-from src.environment import Scenario
-from src.factories import EnvironmentFactory
+from domain.models import Entity, Home, Household, Region
+from environment import Scenario
+from factories import EnvironmentFactory
 
 scenario = Scenario(
     regions=(Region(id=1, name="Coast"),),
@@ -121,9 +121,9 @@ The environment checks references and one-to-one relationships when assembling a
 Both environment factory methods accept `agent_factory`, a callable taking an `Entity` and returning a `HouseAgent`. It is called once per person. Omitting it creates a fresh default `HouseAgent` for each person.
 
 ```python
-from src.agents import HouseAgent
-from src.agents.base import Wait
-from src.factories import EnvironmentFactory, PopulationConfig, RegionConfig
+from agents import HouseAgent
+from agents.base import Wait
+from factories import EnvironmentFactory, PopulationConfig, RegionConfig
 
 environment = EnvironmentFactory.create(
     PopulationConfig(regions=(RegionConfig(name="Coast", households=3),)),

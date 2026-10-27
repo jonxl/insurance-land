@@ -4,8 +4,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
-from src.domain.models import Home
-from src.utils.distributions import validate_shape
+from domain.models import Home
+from utils.distributions import validate_shape
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from math import isfinite
 
-from src.domain.models import Home
-from src.utils.distributions import poisson_count, random_stream, validate_shape
+from domain.models import Home
+from utils.distributions import poisson_count, random_stream, validate_shape
 
 
 @dataclass(frozen=True, slots=True)

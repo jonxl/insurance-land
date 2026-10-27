@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from src.domain.models import Entity, Home, Household, Region
+from domain.models import Entity, Home, Household, Region
 
 
 @dataclass(frozen=True, slots=True)

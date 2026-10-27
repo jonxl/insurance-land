@@ -3,10 +3,10 @@ from decimal import Decimal
 
 import pytest
 
-from src.domain.disasters import DisasterConfig
-from src.domain.housing import HousingMarket
-from src.factories import EnvironmentFactory, GridPopulationConfig, GridPopulationFactory
-from src.utils.distributions import PowerLorenz
+from domain.disasters import DisasterConfig
+from domain.housing import HousingMarket
+from factories import EnvironmentFactory, GridPopulationConfig, GridPopulationFactory
+from utils.distributions import PowerLorenz
 
 
 def test_grid_is_reproducible_and_has_consistent_relationships() -> None:

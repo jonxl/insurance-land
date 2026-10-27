@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from decimal import Decimal
 from random import Random
 
-from src.domain.models import Entity, Home, Household, Region
-from src.environment import Scenario
-from src.utils.validation.money import validate_money
+from domain.models import Entity, Home, Household, Region
+from environment import Scenario
+from utils.validation.money import validate_money
 
 
 @dataclass(frozen=True, slots=True)

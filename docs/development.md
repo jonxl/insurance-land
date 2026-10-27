@@ -6,7 +6,7 @@ Functions should represent coherent operations. A function can be useful even wh
 
 Domain rules belong near the economic concepts they govern. For example, `HousingMarket.pay_rent` owns cash settlement, while `HouseAgent.pay_rent` owns the decision to request payment. The environment owns their sequencing.
 
-Shared helpers belong in categorized utility packages. The current validation helpers live in `src/utils/validation/`:
+Shared helpers belong in categorized utility packages. The current validation helpers live in `utils/validation/`:
 
 | Helper | Responsibility |
 | --- | --- |
@@ -21,7 +21,7 @@ From the repository root:
 
 ```bash
 uv sync --locked
-uv run python -m src.main
+uv run python main.py
 uv run pytest -q
 uv run ruff check
 uv run ruff format --check
@@ -34,7 +34,7 @@ To apply the configured formatter:
 uv run ruff format
 ```
 
-Configuration lives in [pyproject.toml](../pyproject.toml). Ruff targets Python 3.14 and uses a 100-character line length. Enabled lint rule families cover Python errors, unused code, imports, common bug patterns, modernization, and simplification. mypy runs in strict mode over `src` and `tests`.
+Configuration lives in [pyproject.toml](../pyproject.toml). Ruff targets Python 3.14 and uses a 100-character line length. Enabled lint rule families cover Python errors, unused code, imports, common bug patterns, modernization, and simplification. mypy runs in strict mode over the application modules and `tests`.
 
 pytest discovers tests in `tests/`, adds the repository root to the import path, and enables strict configuration and marker checking.
 
@@ -42,7 +42,7 @@ pytest discovers tests in `tests/`, adds the repository root to the import path,
 
 Use uv for dependency changes. Add application dependencies with `uv add <package>` and development tools with `uv add --dev <package>`. Keep `pyproject.toml` and `uv.lock` together when dependency requirements change.
 
-The project is configured as an application with `package = false`. Imports use the `src` package from the repository root. The main module is executed with `python -m src.main` through uv.
+The project is configured as an application with `package = false`. Application packages live at the repository root. Run `uv run python main.py` from that directory.
 
 ## Test organization
 

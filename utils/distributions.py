@@ -8,7 +8,7 @@ from hashlib import sha256
 from math import exp, isfinite, sqrt
 from random import Random
 
-from src.utils.validation.money import validate_money
+from utils.validation.money import validate_money
 
 
 def random_stream(seed: int, component: str) -> Random:

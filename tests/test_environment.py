@@ -5,11 +5,11 @@ from typing import Any, cast
 
 import pytest
 
-from src.agents.base import Action, Observation, PayRent, Wait
-from src.agents.house import HouseAgent
-from src.domain.models import Entity, Home, Household, Region
-from src.environment import Environment, Scenario
-from src.factories import EnvironmentFactory
+from agents.base import Action, Observation, PayRent, Wait
+from agents.house import HouseAgent
+from domain.models import Entity, Home, Household, Region
+from environment import Environment, Scenario
+from factories import EnvironmentFactory
 
 
 @pytest.fixture

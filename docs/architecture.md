@@ -4,57 +4,43 @@
 
 ```text
 insurance-land/
-├── pyproject.toml
-├── uv.lock
-├── .python-version
-├── src/
-│   ├── __init__.py
-│   ├── main.py
-│   ├── environment.py
-│   ├── agents/
-│   │   ├── base.py
-│   │   ├── house.py
-│   │   └── insurance.py
-│   ├── domain/
-│   │   ├── models.py
-│   │   └── housing.py
-│   ├── factories/
-│   │   ├── population.py
-│   │   └── environment.py
-│   └── utils/
-│       └── validation/
-│           ├── collections.py
-│           └── money.py
+├── main.py                # Experiment runner
+├── environment.py         # Simulation orchestration
+├── agents/                # Policy interfaces and baselines
+├── domain/                # Housing, insurance, disasters, and records
+├── factories/             # Population and environment construction
+├── utils/
+│   ├── distributions.py   # Reusable mathematical generators
+│   └── validation/
 ├── tests/
-│   ├── test_agents.py
-│   ├── test_environment.py
-│   ├── test_factories.py
-│   └── test_housing.py
-└── docs/
+├── docs/
+├── plans/
+├── pyproject.toml
+└── uv.lock
 ```
 
-The application code lives directly under `src/`. Subdirectories group code by responsibility; their `__init__.py` files establish Python packages. The main loop lives in `src/main.py`.
+`main.py` runs experiments. Root-level packages group code by responsibility, with imports such as `from factories import EnvironmentFactory`.
 
 ## Responsibilities
 
 | Module | Responsibility |
 | --- | --- |
-| [main.py](../src/main.py) | Choose an experiment configuration, construct the environment, run periods, and report results |
-| [environment.py](../src/environment.py) | Assemble related objects, expose observations, collect decisions, validate actions, and commit each period |
-| [domain/models.py](../src/domain/models.py) | Define economic records and validate their local values |
-| [domain/housing.py](../src/domain/housing.py) | Maintain people and homes, enforce housing relationships, and apply economic changes |
-| [agents/base.py](../src/agents/base.py) | Define the generic controller interface and the house observation/action types |
-| [agents/house.py](../src/agents/house.py) | Implement house decisions, including the rent-payment behavior |
-| [agents/insurance.py](../src/agents/insurance.py) | Adapt an insurance policy callable to the shared controller interface |
-| [factories/population.py](../src/factories/population.py) | Generate an initial scenario from population parameters and a seed |
-| [factories/environment.py](../src/factories/environment.py) | Attach a separate house agent to each person and construct the environment |
-| [utils/validation](../src/utils/validation/) | Share money validation and unique-ID indexing helpers |
+| [main.py](../main.py) | Choose an experiment configuration, construct the environment, run periods, and report results |
+| [environment.py](../environment.py) | Assemble related objects, expose observations, collect decisions, validate actions, and commit each period |
+| [domain/models.py](../domain/models.py) | Define economic records and validate their local values |
+| [domain/housing.py](../domain/housing.py) | Maintain people and homes, enforce housing relationships, and apply economic changes |
+| [agents/base.py](../agents/base.py) | Define the generic controller interface and the house observation/action types |
+| [agents/house.py](../agents/house.py) | Implement house decisions, including the rent-payment behavior |
+| [agents/insurance.py](../agents/insurance.py) | Adapt an insurance policy callable to the shared controller interface |
+| [factories/population.py](../factories/population.py) | Generate an initial scenario from population parameters and a seed |
+| [factories/environment.py](../factories/environment.py) | Attach a separate house agent to each person and construct the environment |
+| [utils/validation](../utils/validation/) | Share money validation and unique-ID indexing helpers |
 
 ## Construction and execution flow
 
 ```mermaid
 flowchart TD
-    Main[src/main.py] --> Config[PopulationConfig]
+    Main[main.py] --> Config[PopulationConfig]
     Config --> EF[EnvironmentFactory]
     EF --> PF[PopulationFactory]
     PF --> Scenario[Scenario: regions, people, households, homes]
