@@ -216,3 +216,50 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# LaTeX compilation artifacts (keep .tex, .bib, styles, and figure sources)
+*.aux
+*.out
+*.toc
+*.lof
+*.lot
+*.loa
+*.fls
+*.fdb_latexmk
+*.synctex
+*.synctex.gz
+*.synctex(busy)
+*.dvi
+*.xdv
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.idx
+*.ind
+*.ilg
+*.glo
+*.gls
+*.glg
+*.glsdefs
+*.acn
+*.acr
+*.alg
+*.ist
+*.nav
+*.snm
+*.vrb
+*.spl
+*.loe
+*.thm
+*.lol
+*.listing
+*.pyg
+*.w18
+_minted*/
+*.synctex.gz(busy)
+
+# Compiled reports; PDF figures are inputs to LaTeX and remain trackable
+/plans/**/.build/
+/plans/**/*.pdf
+!/plans/**/figures/*.pdf
