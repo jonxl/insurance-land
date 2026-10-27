@@ -1,5 +1,7 @@
 # Environment and simulation lifecycle
 
+This guide describes the base housing loop. With insurers configured, call `open_insurance()` before the first step. Configured disasters run after rent settlement, followed by claims; returned observations include these effects. See [initial distributions](initial-distributions.md) for the full grid experiment and timing rules.
+
 [Environment](../src/environment.py) connects the economic records to controllers and coordinates each simulation period. [src/main.py](../src/main.py) decides how many times to advance it.
 
 ## Assembly

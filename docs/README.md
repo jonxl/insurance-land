@@ -8,6 +8,7 @@ Each person has an individual budget, a single-person household, and a `HouseAge
 
 | Document | What it explains |
 | --- | --- |
+| [Initial distributions](initial-distributions.md) | Seeded grids, Lorenz allocations, disasters, and insurance experiments |
 | [Getting started](getting-started.md) | uv setup, running the main loop, and inspecting a small simulation |
 | [Architecture](architecture.md) | Directory layout, responsibilities, relationships, and state management |
 | [Domain model](domain-model.md) | People, households, regions, homes, money, and housing operations |
@@ -27,7 +28,7 @@ uv sync --locked
 uv run python -m src.main
 ```
 
-The entry point creates two regions, 30 people, 30 households, and 30 homes, then runs three periods. See [getting started](getting-started.md) for the population breakdown and commands for verification.
+The entry point creates a 4-by-4 grid with 16 people and three insurers, opens coverage, then runs three periods with disaster exposure. See [initial distributions](initial-distributions.md) for configuration and the explicit toy contract rules.
 
 ## Core relationships
 

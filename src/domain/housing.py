@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import replace
 from decimal import Decimal
 from types import MappingProxyType
@@ -67,6 +67,8 @@ class HousingMarket:
     def move_in(self, home_id: int, entity_id: int, *, rent: Decimal) -> None:
         """Set rent per payment call and move out of any previous residence."""
         home = self._homes[home_id]
+        if home.destroyed:
+            raise ValueError("Cannot occupy a destroyed home")
         previous = self.residence(entity_id)
         if home.occupant_id is not None:
             raise ValueError(f"Home {home_id} is already occupied")
@@ -100,3 +102,20 @@ class HousingMarket:
         self._entities[tenant.id] = paid_tenant
         self._entities[owner.id] = paid_owner
         return True
+
+    def destroy(self, cells: Iterable[tuple[int, int]]) -> tuple[Home, ...]:
+        """Destroy intact homes once; retain titles and return pre-loss snapshots."""
+        affected = set(cells)
+        losses = tuple(
+            h for h in self._homes.values() if h.position in affected and not h.destroyed
+        )
+        for home in losses:
+            self._homes[home.id] = replace(
+                home, market_value=Decimal(0), occupant_id=None, rent=Decimal(0), destroyed=True
+            )
+        return losses
+
+    def adjust_cash(self, person_id: int, amount: Decimal) -> None:
+        """Apply an external cash flow, rejecting insufficient funds via Entity validation."""
+        person = self._entities[person_id]
+        self._entities[person_id] = replace(person, cash=person.cash + amount)

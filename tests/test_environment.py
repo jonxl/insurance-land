@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from dataclasses import replace
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -179,7 +179,8 @@ def test_agent_instance_cannot_be_shared_between_people(scenario: Scenario) -> N
 @pytest.mark.parametrize("field", ["regions", "people", "households", "homes"])
 def test_duplicate_object_ids_are_rejected(scenario: Scenario, field: str) -> None:
     values = getattr(scenario, field)
-    duplicate = replace(scenario, **{field: (*values, values[0])})
+    changes: dict[str, Any] = {field: (*values, values[0])}
+    duplicate = replace(scenario, **changes)
     with pytest.raises(ValueError, match="Duplicate|already exists"):
         EnvironmentFactory.from_scenario(duplicate)
 

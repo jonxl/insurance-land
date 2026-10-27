@@ -23,16 +23,9 @@ uv run python -m src.main
 
 [src/main.py](../src/main.py) contains a `main()` function and the usual module entry guard. Importing the module defines the function; executing it starts the simulation.
 
-`main()` creates this configuration:
+`main()` creates a seeded 4-by-4 grid with 16 people and three insurance firms. Lorenz curves assign incomes and home counts, spatial noise generates prices, and income-biased matching assigns residences. The example opens insurance coverage and runs three periods, reporting disasters, destroyed homes, and paid claims.
 
-| Region | People and households | Homes | Occupied homes | Vacant homes | People without a residence |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Coast | 10 | 12 | 10 | 2 | 0 |
-| Inland | 20 | 18 | 18 | 0 | 2 |
-
-The factory uses seed `42` to determine resident allocation and ownership. It assigns one controller to every person, including people without a residence. Each iteration of the three-period loop calls `environment.step()` and prints the number of successful and unsuccessful rent-payment actions.
-
-A successful payment result means the action was accepted and settled according to the housing rules. An unsuccessful payment means the tenant did not have enough cash. The default controller only requests payments for occupied rental homes with positive rent.
+Policies are deterministic examples, not trained agents. The [initial-distributions guide](initial-distributions.md) explains the reusable configuration, matrix snapshots, and explicit payment and disaster rules.
 
 ## Create and inspect a small environment
 
@@ -62,7 +55,7 @@ assert result.period == 1
 print(result.actions)
 ```
 
-Change the configuration in `src/main.py` to choose the main simulation's population, seed, balances, income, values, and rents. The loop determines how many periods run. The [factories guide](factories.md) describes every configuration field.
+Change the configuration in `src/main.py` to choose the main simulation's population, seed, balances, income, values, and rents. The loop determines how many periods run. The [factories guide](factories.md) covers the original region-based factory; the [initial-distributions guide](initial-distributions.md) covers the grid factory.
 
 ## Verification commands
 

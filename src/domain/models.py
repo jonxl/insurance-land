@@ -9,8 +9,11 @@ class Entity:
     id: int
     cash: Decimal = Decimal("0")
     income: Decimal = Decimal("0")
+    annual_income: Decimal | None = None
 
     def __post_init__(self) -> None:
+        if self.annual_income is not None:
+            validate_money(self.annual_income, field="annual_income")
         validate_money(self.cash, field="cash")
         validate_money(self.income, field="income")
 
@@ -41,8 +44,18 @@ class Home:
     market_value: Decimal
     occupant_id: int | None = None
     rent: Decimal = Decimal("0")
+    position: tuple[int, int] | None = None
+    destroyed: bool = False
 
     def __post_init__(self) -> None:
+        if self.position is not None and (
+            len(self.position) != 2 or any(type(v) is not int or v < 0 for v in self.position)
+        ):
+            raise ValueError("position must contain two nonnegative integer coordinates")
+        if self.destroyed and (
+            self.market_value != 0 or self.occupant_id is not None or self.rent != 0
+        ):
+            raise ValueError("Destroyed homes must have zero value and rent and no resident")
         validate_money(self.market_value, field="market_value")
         validate_money(self.rent, field="rent")
         if (self.occupant_id is None or self.occupant_id == self.owner_id) and self.rent != 0:
