@@ -109,3 +109,36 @@ def test_invalid_grid_and_footprint() -> None:
                 scenario, homes=(scenario.homes[0], replace(scenario.homes[1], position=(0, 0)))
             )
         )
+
+
+def test_hidden_risk_is_fixed_private_and_counts_are_independent() -> None:
+    import numpy as np
+
+    config = GridPopulationConfig(rows=4, columns=5, seed=21)
+    uniform = DisasterConfig(rate=5, footprint_rows=2, risk_contrast=0)
+    spatial = replace(uniform, risk_contrast=1.5)
+    probabilities = spatial.risk_probabilities((4, 5), seed=21)
+    assert not probabilities.flags.writeable
+    assert np.ptp(probabilities) > 0
+    np.testing.assert_array_equal(probabilities, spatial.risk_probabilities((4, 5), seed=21))
+    first = EnvironmentFactory.create(config, disasters=uniform)
+    second = EnvironmentFactory.create(config, disasters=spatial)
+    assert first.grid_snapshot() == second.grid_snapshot()
+    assert not hasattr(second.observe(1), "risk_probabilities")
+    for _ in range(5):
+        assert len(first.step().disasters) == len(second.step().disasters)
+    with pytest.raises(ValueError):
+        probabilities[0, 0] = 1
+
+
+def test_random_placement_preserves_resources_and_ownership_quotas() -> None:
+    base = GridPopulationConfig(rows=4, columns=5, seed=9)
+    ranked = GridPopulationFactory.create(base)
+    random = GridPopulationFactory.create(replace(base, placement_mode="random"))
+    assert ranked.people == random.people
+    assert [h.market_value for h in ranked.homes] == [h.market_value for h in random.homes]
+    assert sorted(h.occupant_id for h in random.homes if h.occupant_id) == list(range(1, 21))
+    for person in ranked.people:
+        assert sum(h.owner_id == person.id for h in ranked.homes) == sum(
+            h.owner_id == person.id for h in random.homes
+        )

@@ -100,6 +100,11 @@ class Environment:
                 or disasters.footprint_columns > self._grid_shape[1]
             ):
                 raise ValueError("Disaster footprint must fit within the grid")
+        self._risk_probabilities = (
+            disasters.risk_probabilities(self._grid_shape, seed=self._seed)
+            if disasters is not None and self._grid_shape is not None
+            else None
+        )
         self._insurance = InsuranceMarket(insurers)
         self._insurer_agents = dict(insurer_agents or {})
         if self._insurer_agents.keys() != self._insurance.firms.keys():
@@ -264,7 +269,10 @@ class Environment:
         claims: list[Claim] = []
         if disaster_config is not None and self._grid_shape is not None:
             for cells in disaster_config.footprints(
-                self._grid_shape, seed=self._seed, period=period
+                self._grid_shape,
+                seed=self._seed,
+                period=period,
+                probabilities=self._risk_probabilities,
             ):
                 losses = market.destroy(cells)
                 disaster_results.append(DisasterResult(cells, losses))
