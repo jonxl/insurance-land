@@ -44,18 +44,24 @@
   \setlength{\abovedisplayshortskip}{3pt}%
   \setlength{\belowdisplayshortskip}{4pt}%
 }
-\title{Project Update:\\Multi-Agent Housing and Insurance Market}
-\author{Alejandro Ordonez, Jon Legasa, Neil Dhawan}
+\title{Project Update: Multi-Agent Housing and Insurance Market}
+\author{Neil Dhawan, Jon Legasa, Alejandro Ordonez}
 \date{October 28, 2026}
 
-\begin{document}
+\makeatletter
+\renewcommand{\maketitle}{%
 \begin{center}
-{\Large\bfseries Project Update: Multi-Agent Housing and Insurance Market\par}
+{\Large\bfseries \@title\par}
 \vspace{4pt}
-Alejandro Ordonez, Jon Legasa, Neil Dhawan\par
+\@author\par
 \vspace{4pt}
-October 28, 2026
+\@date\par
 \end{center}
+}
+\makeatother
+
+\begin{document}
+\maketitle
 
 \begin{abstract}
 We have constructed a housing and insurance environment for Q-learning agents using Lorenz allocations of income and ownership, spatially correlated home prices, and income-dependent residence assignment. Poisson disasters destroy homes within fixed zones, linking property losses and displacement to insurance claims. The proposed spatial extension assigns hidden regional risk that agents learn from public disaster histories. Three experimental worlds---``Peace'', ``Standard'', and ``Chaos''---compare equal and unequal initial resources under constant or increasing disaster rates.
