@@ -401,6 +401,33 @@ Ownership remains unchanged. The former resident is displaced, and contracts det
 
 Within-period ordering, claims timing, replacement housing, and rebuilding remain open.
 
+\section{Tabular Q-learning for the two agent types}
+People and insurers choose from different actions, so we use two tabular Q-learners, $Q^{h}$ and $Q^{f}$, with separate states, action sets $\mathcal{A}^{h},\mathcal{A}^{f}$, discount factor $\gamma$, and rewards $r$. For type $k\in\{h,f\}$, both use
+\begin{equation}
+ Q^{k}(s,a)\gets Q^{k}(s,a)+\alpha\Big[r+\gamma\max_{a'}Q^{k}(s',a')-Q^{k}(s,a)\Big],
+\end{equation}
+with $\varepsilon$-greedy action selection and one shared table per type. All specifications below are proposals.
+
+\paragraph{Households.} The state is $s^{h}_i=(\text{role}_i,\text{current insurer}_i,\text{displaced}_i, \text{house price/rent price}_i)$, where the role is owner-occupier, renter, landlord, or none, and the insurer is one of $1,\ldots,F$ or none. A person takes one action per period. Opting in selects one insurer's offer for the product their status in $O$ and $R$ implies, with the premium deducted from income each period; only one policy is active at a time.
+\begin{equation}
+\begin{aligned}
+ \mathcal{A}^{h}=\{&\text{buy home},\ \text{sell home},\ \text{pay rent},\ \text{rent out home},\ \text{hold},\\
+ &\text{opt in to insurer }1,\ \ldots,\ \text{opt in to insurer }F,\ \text{opt out}\}.
+\end{aligned}
+\end{equation}
+Actions are limited by role and cash, and buying, selling, and rent still require transaction rules, which remain open. The reward is the change in net position, after premiums, less a displacement penalty $\kappa\ge0$:
+\begin{equation}
+ r^{h}_i=\Delta c_i+\Delta\big(\text{property wealth}_i\big)-\kappa\,\mathbf{1}_{\{\text{displaced}_i\}}.
+\end{equation}
+
+\paragraph{Insurers.} With limits and deductibles fixed, a firm adjusts one product's premium per period on a bounded ladder of multiples of a fitted pure premium, so $\mathcal{A}^{f}=\{\text{raise},\ \text{lower},\ \text{keep}\}$. The pure premium comes from a Tweedie GLM fit offline to regional loss data, which suits losses that are zero in most periods and skewed otherwise. Idle capital earns a risk-free rate $r_f\ge0$, so $\text{capital}_j\gets(1+r_f)\,\text{capital}_j+\text{premiums}_j-\text{claims}_j$. The state and reward are
+\begin{equation}
+ s^{f}_j=\big(\text{premium level}_j,\ \mathbf{1}_{\{\text{capital}_j>0\}}\big),
+ \qquad
+ r^{f}_j=\text{premiums}_j-\text{claims}_j-\kappa_f\,\mathbf{1}_{\{\text{capital}_j\le0\}},
+\end{equation}
+with insolvency penalty $\kappa_f\ge0$. Competitors' premiums change what households buy, so each firm faces a non-stationary environment, which we treat as part of the study.
+
 \section{Next research questions}
 The next stage is to define and study agent behavior within this toy market:
 
