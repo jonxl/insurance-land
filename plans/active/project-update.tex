@@ -98,12 +98,12 @@ Disasters produce losses across neighboring homes, exposing owners, residents, a
 \begin{itemize}
 \item \textbf{Agents and objectives.} Individual and insurer agents use Q-learning to maximize expected discounted cumulative rewards. Renter, owner-occupier, and landlord are housing relationships, not fixed agent types.
 \item \textbf{Housing and allocation.} Each grid cell is one home. The population and housing supply are fixed and equal, with one resident per home initially. Ownership is separate from residence and may be concentrated. Initial allocation does not enforce affordability. Initial prices are positive; rent and starting capital are configured separately.
-\item \textbf{Income and inequality.} External income is assigned once and paid each period; jobs are not simulated. Income and ownership curves share a agent ranking. Recurring income adds money to the economy. ``Peace'' imposes equal initial resources, with no ongoing wealth cap or redistribution.
+\item \textbf{Income and inequality.} External income is assigned once, accrues each period, and is paid every 10 completed simulation runs; landlords receive accrued rent every 20 completed runs. Section~\ref{sec:payment-schedule} defines the payment clock. Jobs are not simulated. Income and ownership curves share a agent ranking. Recurring income adds money to the economy. ``Peace'' imposes equal initial resources, with no ongoing wealth cap or redistribution.
 \item \textbf{Spatial fields.} Seeded noise generates initial prices and a separate disaster-risk field. The risk field is independent of initial prices and remains fixed during an episode. Spatial boundaries do not wrap. A global seed supplies separate random streams for reproducible runs.
 \item \textbf{Disaster occurrence.} Each period, draw the number of disasters from a Poisson distribution. Choose each disaster location independently using the hidden risk map. Every event affects a rectangle of the same size, entirely within the grid. The event rate may change over time; the risk map and rectangle size stay fixed.
 \item \textbf{Public information.} After each disaster, every agent and insurer observes its time, affected cells, and resulting housing damage across the grid. The underlying risk field and location probabilities are not provided to agents. They can learn about regional risk from the shared event history, including events outside their own holdings.
 \item \textbf{Damage and recovery.} An affected intact home loses all modeled value and becomes uninhabitable. Its resident is displaced and its owner retains title. Surviving land value, rebuilding, and replacement housing are omitted. Repeated damage to an already destroyed home generates no new building loss.
-\item \textbf{Insurance and timing.} Coverage is chosen before exposure, with up-front premiums and fixed contract terms. Income precedes rent, disasters, and claims. Claims use pre-loss building values or specified contents amounts, subject to deductibles, coverage limits, and available insurer capital. Capital shortfalls are recorded; claims are settled after each event.
+\item \textbf{Insurance and timing.} Coverage is chosen before exposure, with up-front premiums and fixed contract terms. Income and rent accrue during each run and settle on their scheduled run boundaries; when both are due, income is paid before rent. Disasters and claims continue within each run. Claims use pre-loss building values or specified contents amounts, subject to deductibles, coverage limits, and available insurer capital. Capital shortfalls are recorded; claims are settled after each event.
 \end{itemize}
 
 \section{Environment and notation}
@@ -120,24 +120,27 @@ Let $i$ index agents, $t$ simulation periods, and $(a,b)$ and $(u,v)$ home locat
 \end{equation}
 Quantities are current unless stated otherwise.
 
-\renewcommand{\arraystretch}{1.08}
-\begin{longtable}{@{}p{0.10\textwidth}p{0.29\textwidth}p{0.56\textwidth}@{}}
+\begingroup
+\renewcommand{\arraystretch}{1.0}
+\setlength{\LTpre}{2pt}
+\setlength{\LTpost}{2pt}
+\begin{longtable}{@{}p{0.17\textwidth}>{\raggedright\arraybackslash}p{\dimexpr0.83\textwidth-2\tabcolsep\relax}@{}}
 \toprule
-\textbf{Symbol} & \textbf{Domain} & \textbf{Meaning} \\
+\textbf{Symbol} & \textbf{Meaning} \\
 \midrule
 \endfirsthead
 \toprule
-\textbf{Symbol} & \textbf{Domain} & \textbf{Meaning (continued)} \\
+\textbf{Symbol} & \textbf{Meaning (continued)} \\
 \midrule
 \endhead
 \bottomrule
 \endfoot
-$P$ & $\mathbb{R}_{\geq0}^{m\times n}$ & Home values. \\
-$O$ & $\{1,\ldots,N\}^{m\times n}$ & Owners, represented by agent indices. \\
-$R$ & $\{0,\ldots,N\}^{m\times n}$ & Residents; zero denotes vacancy. \\
-$D$ & $\{0,1\}^{m\times n}$ & Destruction indicators; one denotes an uninhabitable home. \\
-$\mathbf{y}$ & $\mathbb{R}_{\geq0}^{N}$ & Fixed annual external incomes. \\
-$\mathbf{c}$ & $\mathbb{R}_{\geq0}^{N}$ & Cash balances. \\
+$P$ & $\mathbb{R}_{\geq0}^{m\times n}$. Home values. \\
+$O$ & $\{1,\ldots,N\}^{m\times n}$. Owners, represented by agent indices. \\
+$R$ & $\{0,\ldots,N\}^{m\times n}$. Residents; zero denotes vacancy. \\
+$D$ & $\{0,1\}^{m\times n}$. Destruction indicators; one denotes an uninhabitable home. \\
+$\mathbf{y}$ & $\mathbb{R}_{\geq0}^{N}$. Fixed annual external incomes. \\
+$\mathbf{c}$ & $\mathbb{R}_{\geq0}^{N}$. Cash balances. \\
 \end{longtable}
 
 Initially, $P\in\mathbb{R}_{>0}^{m\times n}$, $D=0$, and each agent appears once in $R$. Ownership indices may repeat. A tenancy occurs where $R_{ab}>0$ and $R_{ab}\ne O_{ab}$. After displacement, a agent may have no residence.
@@ -165,29 +168,63 @@ The ownership indicator $\mathbf{1}_{\{O_{ab}=i\}}$ identifies homes belonging t
 
 Contracts link agents, insurers, homes, and coverage terms.
 
-\subsection{Distribution functions and parameters}
-\begin{longtable}{@{}p{0.10\textwidth}p{0.29\textwidth}p{0.56\textwidth}@{}}
+\subsection{Learning terminology and notation}
+The proposed tabular Q-learning specification in Section~\ref{sec:rl-agents} uses \emph{household} for an individual agent and \emph{firm} for an insurer. These are the two learner types; housing roles describe a household's relationship to homes. Reinforcement learning (RL) updates action values from rewards observed through interaction with the environment. A tabular Q-learner stores these values in a table indexed by state and action.
+
+\begin{longtable}{@{}p{0.17\textwidth}>{\raggedright\arraybackslash}p{\dimexpr0.83\textwidth-2\tabcolsep\relax}@{}}
 \toprule
-\textbf{Symbol} & \textbf{Domain} & \textbf{Definition} \\
+\textbf{Symbol or term} & \textbf{Meaning} \\
 \midrule
 \endfirsthead
 \toprule
-\textbf{Symbol} & \textbf{Domain} & \textbf{Definition (continued)} \\
+\textbf{Symbol or term} & \textbf{Meaning (continued)} \\
 \midrule
 \endhead
 \bottomrule
 \endfoot
-$L_y,L_h$ & $[0,1]\to[0,1]$ & Lorenz functions for income and home counts along the same agent ordering. \\
-$\mu$ & $\mathbb{R}_{>0}$ & Mean annual external income. \\
-$\Delta t$ & $\mathbb{R}_{>0}$ & Period length in years. \\
-$p_0$ & $\mathbb{R}_{>0}$ & Reference home price. \\
-$\sigma,\ell$ & $\mathbb{R}_{\geq0}$ & Log-price variation and spatial smoothing scale. \\
-$\tau$ & $\mathbb{R}_{\geq0}$ & Noise strength for residence placement. \\
-$\lambda_t$ & $\mathbb{R}_{\geq0}$ & Expected disasters in period $t$. \\
-$S$ & $\mathbb{Z}_{\geq0}$ & Global seed for labeled component random streams. \\
+$k$ & $\{h,f\}$. Learner type: household ($h$) or insurer ($f$); these superscripts label types. \\
+$j$ & $\{1,\ldots,F\}$. Insurer index in the learning specification. \\
+$s,s'$ & Type-specific states. Current and next state; $s_i^h$ and $s_j^f$ denote household and insurer states. \\
+$\mathcal{A}^k$ & Type-specific action set. Actions for learner type $k$; $a$ is the chosen action and $a'$ indexes candidate next actions. Here $a$ denotes an action, rather than a grid coordinate. \\
+$Q^k(s,a)$ & $\mathbb{R}$. Estimated discounted return for a state--action pair, stored in the shared table for type $k$. \\
+$\alpha$ & $(0,1]$. Learning rate controlling the size of a Q-value update. \\
+$\gamma$ & $[0,1]$. Discount factor weighting future rewards. \\
+$\varepsilon$ & $[0,1]$. Exploration probability in $\varepsilon$-greedy action selection; otherwise an action with maximal Q-value is selected. \\
+$r,r_i^h,r_j^f$ & $\mathbb{R}$. Immediate reward, with household and insurer forms defined in the learning specification. \\
+$\Delta$ & Change operator. Change in a quantity over a period, as used in the household reward. \\
+$\kappa,\kappa_f$ & $\mathbb{R}_{\geq0}$. Household displacement and insurer insolvency penalties. \\
+$r_f$ & $\mathbb{R}_{\geq0}$. Risk-free rate applied to insurer capital per period; distinct from the insurer reward $r_j^f$. \\
+Pure premium & Expected loss cost. Fitted loss cost used as the reference for the insurer's premium ladder. \\
+Tweedie GLM & Statistical model. Tweedie generalized linear model used in the proposed offline pure-premium fit. \\
+\end{longtable}
+
+\subsection{Distribution functions and parameters}
+\begin{longtable}{@{}p{0.17\textwidth}>{\raggedright\arraybackslash}p{\dimexpr0.83\textwidth-2\tabcolsep\relax}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Definition} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Symbol} & \textbf{Definition (continued)} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+$L_y,L_h$ & $[0,1]\to[0,1]$. Lorenz functions for income and home counts along the same agent ordering. \\
+$\mu$ & $\mathbb{R}_{>0}$. Mean annual external income. \\
+$\Delta t$ & $\mathbb{R}_{>0}$. Period length in years. \\
+$q$ & $\mathbb{Z}_{\geq0}$. Completed simulation runs in a payment sequence; each run contains $T$ periods. \\
+$I_q,J_q$ & $\{0,1\}$. Income and rent payment indicators at run boundary $q$, defined in Section~\ref{sec:payment-schedule}. \\
+$p_0$ & $\mathbb{R}_{>0}$. Reference home price. \\
+$\sigma,\ell$ & $\mathbb{R}_{\geq0}$. Log-price variation and spatial smoothing scale. \\
+$\tau$ & $\mathbb{R}_{\geq0}$. Noise strength for residence placement. \\
+$\lambda_t$ & $\mathbb{R}_{\geq0}$. Expected disasters in period $t$. \\
+$S$ & $\mathbb{Z}_{\geq0}$. Global seed for labeled component random streams. \\
 \end{longtable}
 
 Agents are indexed by nondecreasing income, with seeded tie-breaking.
+
+\endgroup
 
 \section{Assigning initial home values}
 \label{sec:home-values}
@@ -283,10 +320,22 @@ Repeat until $\sum_i h_i=H$, recomputing residuals and breaking ties by seed. Ow
 
 
 
-Fixed annual income contributes to cash each period:
+\subsection{Payment schedule across simulation runs}
+\label{sec:payment-schedule}
+Let $q$ count completed simulation runs (episodes), each lasting $T\Delta t$ years. Income is paid every 10 runs and rent every 20:
 \begin{equation}
- \mathbf{c}\gets\mathbf{c}+\Delta t\,\mathbf{y}.
+\begin{aligned}
+ I_q&=\mathbf{1}_{\{q>0\ \text{and}\ q\bmod 10=0\}},
+ & &\text{income payment},\\
+ J_q&=\mathbf{1}_{\{q>0\ \text{and}\ q\bmod 20=0\}},
+ & &\text{rent payment}.
+\end{aligned}
 \end{equation}
+Income accumulates between paydays:
+\begin{equation}
+ \mathbf{c}\gets\mathbf{c}+I_q\,(10T\Delta t)\,\mathbf{y}.
+\end{equation}
+When $J_q=1$, tenants transfer accrued rent to their landlords, after income is credited. Cash and unpaid balances carry between runs; independent sequences start at $q=0$ with no payment due. Rent amounts and insufficient-cash rules remain open.
 
 
 
@@ -485,6 +534,37 @@ This update displaces the resident and removes the owner's property value while 
 \end{algorithmic}
 \end{algorithm}
 
+The environment above supplies the housing, insurance, and disaster outcomes used by the proposed learning agents. The following section specifies their states, actions, and rewards; Section~\ref{sec:environment-variants} then defines the experimental worlds in which these learners will be compared.
+
+\section{Tabular Q-learning for the two agent types}
+People and insurers choose from different actions, so we use two tabular Q-learners, $Q^{h}$ and $Q^{f}$, with separate states, action sets $\mathcal{A}^{h},\mathcal{A}^{f}$, discount factor $\gamma$, and rewards $r$. For type $k\in\{h,f\}$, both use
+\begin{equation}
+ Q^{k}(s,a)\gets Q^{k}(s,a)+\alpha\Big[r+\gamma\max_{a'}Q^{k}(s',a')-Q^{k}(s,a)\Big],
+\end{equation}
+with $\varepsilon$-greedy action selection and one shared table per type. All specifications below are proposals.
+
+\paragraph{Households.} The state is $s^{h}_i=(\text{role}_i,\text{current insurer}_i,\text{displaced}_i, \text{house price/rent price}_i)$, where the role is owner-occupier, renter, landlord, or none, and the insurer is one of $1,\ldots,F$ or none. A person takes one action per period. Opting in selects one insurer's offer for the product their status in $O$ and $R$ implies, with the premium deducted from income each period; only one policy is active at a time.
+\begin{equation}
+\begin{aligned}
+ \mathcal{A}^{h}=\{&\text{buy home},\ \text{sell home},\ \text{pay rent},\ \text{rent out home},\ \text{hold},\\
+ &\text{opt in to insurer }1,\ \ldots,\ \text{opt in to insurer }F,\ \text{opt out}\}.
+\end{aligned}
+\end{equation}
+Actions are limited by role and cash, and buying, selling, and rent still require transaction rules, which remain open. The reward is the change in net position, after premiums, less a displacement penalty $\kappa\ge0$:
+\begin{equation}
+ r^{h}_i=\Delta c_i+\Delta\big(\text{property wealth}_i\big)-\kappa\,\mathbf{1}_{\{\text{displaced}_i\}}.
+\end{equation}
+
+\paragraph{Insurers.} With limits and deductibles fixed, a firm adjusts one product's premium per period on a bounded ladder of multiples of a fitted pure premium, so $\mathcal{A}^{f}=\{\text{raise},\ \text{lower},\ \text{keep}\}$. The pure premium comes from a Tweedie GLM fit offline to regional loss data, which suits losses that are zero in most periods and skewed otherwise. Idle capital earns a risk-free rate $r_f\ge0$, so $\text{capital}_j\gets(1+r_f)\,\text{capital}_j+\text{premiums}_j-\text{claims}_j$. The state and reward are
+\begin{equation}
+ s^{f}_j=\big(\text{premium level}_j,\ \mathbf{1}_{\{\text{capital}_j>0\}}\big),
+ \qquad
+ r^{f}_j=\text{premiums}_j-\text{claims}_j-\kappa_f\,\mathbf{1}_{\{\text{capital}_j\le0\}},
+\end{equation}
+with insolvency penalty $\kappa_f\ge0$. Competitors' premiums change what households buy, so each firm faces a non-stationary environment, which we treat as part of the study.
+
+\label{sec:rl-agents}
+
 \section{Environment Variants}
 \label{sec:environment-variants}
 The worlds ``Peace'', ``Standard'', and ``Chaos'' compare initial resource inequality and disaster-rate schedules.
@@ -501,7 +581,7 @@ Fix the population $N$, insurer count $F$, housing supply $H=N$, episode length 
 \end{equation}
 $M_0$ fixes initial cash; recurring income increases it. $Y$ is an annual income budget, not a full GDP measure.
 
-Matched runs share budgets, insurer capital, footprint, risk field, insurance rules, learning configuration, and seeds. Vary $\eta$ and $\ell_{\mathrm{risk}}$ separately to test spatial concentration.
+Matched runs share budgets, insurer capital, footprint, risk field, insurance rules, learning configuration, and seeds. All three worlds use the same 10-run income and 20-run rent schedule in Section~\ref{sec:payment-schedule}; comparisons use equal numbers of runs and the same payment-clock phase. Initial cash budgets apply at the start of each independent payment sequence. Vary $\eta$ and $\ell_{\mathrm{risk}}$ separately to test spatial concentration.
 
 \subsection{``Peace'': equal initial resources}
 ``Peace'' starts every agent with the same income, one home, and the same cash balance. Every home has the same initial price. Let $M_{\mathrm{agents}}:=M_0-\sum_{f=1}^{F}b_f(0)$ be the nonnegative cash budget assigned to agents. For population share $p\in[0,1]$, choose
@@ -554,35 +634,6 @@ Compare ``Peace'' with ``Standard'' for initial inequality, and ``Standard'' wit
  \bar{\lambda}=\dfrac{1}{T}\sum_{t=0}^{T-1}\lambda_0\exp(gt).
 \end{equation}
 This matches expected event totals. Across seeds, compare coverage choices, holdings, wealth concentration, displacement, and insurer solvency. Vary individual parameters for ablations.
-
-\section{Tabular Q-learning for the two agent types}
-People and insurers choose from different actions, so we use two tabular Q-learners, $Q^{h}$ and $Q^{f}$, with separate states, action sets $\mathcal{A}^{h},\mathcal{A}^{f}$, discount factor $\gamma$, and rewards $r$. For type $k\in\{h,f\}$, both use
-\begin{equation}
- Q^{k}(s,a)\gets Q^{k}(s,a)+\alpha\Big[r+\gamma\max_{a'}Q^{k}(s',a')-Q^{k}(s,a)\Big],
-\end{equation}
-with $\varepsilon$-greedy action selection and one shared table per type. All specifications below are proposals.
-
-\paragraph{Households.} The state is $s^{h}_i=(\text{role}_i,\text{current insurer}_i,\text{displaced}_i, \text{house price/rent price}_i)$, where the role is owner-occupier, renter, landlord, or none, and the insurer is one of $1,\ldots,F$ or none. A person takes one action per period. Opting in selects one insurer's offer for the product their status in $O$ and $R$ implies, with the premium deducted from income each period; only one policy is active at a time.
-\begin{equation}
-\begin{aligned}
- \mathcal{A}^{h}=\{&\text{buy home},\ \text{sell home},\ \text{pay rent},\ \text{rent out home},\ \text{hold},\\
- &\text{opt in to insurer }1,\ \ldots,\ \text{opt in to insurer }F,\ \text{opt out}\}.
-\end{aligned}
-\end{equation}
-Actions are limited by role and cash, and buying, selling, and rent still require transaction rules, which remain open. The reward is the change in net position, after premiums, less a displacement penalty $\kappa\ge0$:
-\begin{equation}
- r^{h}_i=\Delta c_i+\Delta\big(\text{property wealth}_i\big)-\kappa\,\mathbf{1}_{\{\text{displaced}_i\}}.
-\end{equation}
-
-\paragraph{Insurers.} With limits and deductibles fixed, a firm adjusts one product's premium per period on a bounded ladder of multiples of a fitted pure premium, so $\mathcal{A}^{f}=\{\text{raise},\ \text{lower},\ \text{keep}\}$. The pure premium comes from a Tweedie GLM fit offline to regional loss data, which suits losses that are zero in most periods and skewed otherwise. Idle capital earns a risk-free rate $r_f\ge0$, so $\text{capital}_j\gets(1+r_f)\,\text{capital}_j+\text{premiums}_j-\text{claims}_j$. The state and reward are
-\begin{equation}
- s^{f}_j=\big(\text{premium level}_j,\ \mathbf{1}_{\{\text{capital}_j>0\}}\big),
- \qquad
- r^{f}_j=\text{premiums}_j-\text{claims}_j-\kappa_f\,\mathbf{1}_{\{\text{capital}_j\le0\}},
-\end{equation}
-with insolvency penalty $\kappa_f\ge0$. Competitors' premiums change what households buy, so each firm faces a non-stationary environment, which we treat as part of the study.
-
-\label{sec:rl-agents}
 
 \section{Questions for evaluation}
 How does initial inequality affect housing and coverage decisions? How do agents learn regional risk from public disasters, and how does that learning affect insurance pricing and losses?
