@@ -261,5 +261,4 @@ _minted*/
 
 # Compiled reports; PDF figures are inputs to LaTeX and remain trackable
 /plans/**/.build/
-/plans/**/*.pdf
 !/plans/**/figures/*.pdf
