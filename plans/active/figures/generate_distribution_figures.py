@@ -20,6 +20,42 @@ def save(fig, name):
     fig.savefig(OUT / f'{name}.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
 
+# Independent labeled risk stream under the same global seed.
+def plot_hidden_risk():
+    rows = columns = 16
+    footprint = 3
+    risk_length, contrast = 2.0, 1.0
+    risk_rng = np.random.default_rng(np.random.SeedSequence([42, 1]))
+    cells = np.indices((rows, columns)).reshape(2, -1).T
+    distance = ((cells[:, None] - cells[None, :]) ** 2).sum(axis=2)
+    kernel = np.exp(-distance / (2 * risk_length**2))
+    risk_noise = risk_rng.normal(size=rows * columns)
+    smooth = (kernel @ risk_noise) / np.sqrt((kernel**2).sum(axis=1))
+    weights = np.exp(contrast * smooth.reshape(rows, columns))
+    eligible = weights[:rows-footprint+1, :columns-footprint+1]
+    probability = eligible / eligible.sum()
+    assert np.isclose(probability.sum(), 1) and np.all(probability > 0)
+    height, width = probability.shape
+    fig, ax = plt.subplots(figsize=(6, 4.8), layout='constrained')
+    im = ax.imshow(100 * probability, cmap='Purples', interpolation='nearest',
+                   origin='lower', extent=(.5, width+.5, .5, height+.5))
+    ax.set(title='Hidden disaster risk', xlabel='Anchor column b', ylabel='Anchor row a',
+           xticks=[1, 4, 8, 12, 14], yticks=[1, 4, 8, 12, 14])
+    ax.set_xticks(np.arange(.5, width+1), minor=True)
+    ax.set_yticks(np.arange(.5, height+1), minor=True)
+    ax.grid(which='minor', color='white', linewidth=.4)
+    ax.tick_params(which='minor', bottom=False, left=False)
+    fig.colorbar(im, ax=ax, label='Event anchor probability (%)')
+    save(fig, 'hidden-spatial-risk')
+
+plot_hidden_risk()
+
+# Regenerate the new figure alone without rewriting the existing illustrations.
+if __name__ == '__main__':
+    import sys
+    if '--risk-only' in sys.argv:
+        raise SystemExit(0)
+
 # Price field: exactly the normalized finite-grid Gaussian construction in the text.
 m = n = 16
 seed, reference, spread, length = 42, 250000, .4, 2.0
@@ -62,7 +98,7 @@ for ax in axes[0]:
     ax.plot(p, p, color='0.65', ls='--', lw=1, label='Equal shares')
     ax.set(xlim=(0,1), ylim=(0,1), xlabel='Cumulative population share p', ylabel='Cumulative resource share')
 axes[0,0].plot(p, p**2, color=BLUE, label=r'Target $L_y(p)=p^2$')
-axes[0,0].plot(boundaries, np.r_[0, np.cumsum(y)] / y.sum(), 'o-', ms=3, color=ORANGE, label='12-person cumulative shares')
+axes[0,0].plot(boundaries, np.r_[0, np.cumsum(y)] / y.sum(), 'o-', ms=3, color=ORANGE, label='12-agent cumulative shares')
 axes[0,0].set_title('Income Lorenz curve')
 axes[0,1].plot(p, p**3, color=BLUE, label=r'Target $L_h(p)=p^3$')
 axes[0,1].plot(boundaries, np.r_[0, np.cumsum(h)] / H, 'o-', ms=3, color=ORANGE, label='After whole-home rounding')
@@ -71,10 +107,10 @@ for ax in axes[0]:
     ax.legend(fontsize=8, loc='upper left')
 rank = np.arange(1, N+1)
 axes[1,0].bar(rank, y / 1000, color=BLUE)
-axes[1,0].set(title='Assigned income by person', xlabel='Person i, ordered by income', ylabel='Annual income (thousand dollars)')
+axes[1,0].set(title='Assigned income by agent', xlabel='Agent i, ordered by income', ylabel='Annual income (thousand dollars)')
 axes[1,1].scatter(rank, a, facecolors='none', edgecolors=ORANGE, s=45, label='Fractional target')
 axes[1,1].bar(rank, h, width=.55, color=BLUE, alpha=.8, label='Integer home count')
-axes[1,1].set(title='Assigned homes by person', xlabel='Person i, same income ordering', ylabel='Homes owned', yticks=np.arange(0, 4))
+axes[1,1].set(title='Assigned homes by agent', xlabel='Agent i, same income ordering', ylabel='Homes owned', yticks=np.arange(0, 4))
 axes[1,1].legend(fontsize=8)
 for ax in axes[1]:
     ax.set_xticks(rank)
