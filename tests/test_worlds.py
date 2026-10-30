@@ -44,3 +44,28 @@ def test_export_contains_all_worlds_and_no_whole_world_chart(tmp_path: Path) -> 
     assert "worldChart" not in html
     assert "Whole-world history" not in html
     assert "__WORLD_DATA__" not in html
+
+
+@pytest.mark.parametrize("name", ["Peace", "Standard", "Chaos"])
+def test_insurers_follow_existing_owner_portfolios(name):
+    spec = WorldSpec(name=name, rows=4, columns=4, periods=3)
+    world = spec.create()
+    original = GridPopulationFactory.create(spec.population())
+    assignments = world.insurance_assignments
+    assert set(assignments) == set(world.homes)
+    assert set(assignments.values()) == {1, 2, 3}
+    assert set(c.offer.insurer_id for c in world.contracts) == {1, 2, 3}
+    assert all(c.offer.insurer_id == assignments[c.home_id] for c in world.contracts)
+    assert tuple(world.homes.values()) == original.homes
+    for owner in {home.owner_id for home in original.homes}:
+        assert len({assignments[h.id] for h in original.homes if h.owner_id == owner}) == 1
+    assert assignments == spec.create().insurance_assignments
+    for _ in spec.rates():
+        world.step()
+    assert assignments == world.insurance_assignments
+
+
+def test_standard_and_chaos_share_insurer_field():
+    assert WorldSpec(name="Standard").create().insurance_assignments == (
+        WorldSpec(name="Chaos").create().insurance_assignments
+    )

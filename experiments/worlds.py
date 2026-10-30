@@ -7,11 +7,12 @@ from typing import Literal
 
 from agents.house import HouseAgent
 from agents.insurance import InsurancePlanAgent
-from agents.policies import cheapest_affordable_coverage
+from agents.policies import assigned_affordable_coverage
 from domain.disasters import DisasterConfig
 from domain.insurance import Insurer, InsurerObservation, Offer, Product
 from environment import Environment
-from factories import EnvironmentFactory, GridPopulationConfig
+from experiments.portfolios import insurer_portfolios
+from factories import EnvironmentFactory, GridPopulationConfig, GridPopulationFactory
 from utils.distributions import PowerLorenz
 
 
@@ -83,12 +84,21 @@ class WorldSpec:
                 for index, product in enumerate(Product, 1)
             )
 
-        world = EnvironmentFactory.create(
-            self.population(),
+        scenario = GridPopulationFactory.create(self.population())
+        assignments = insurer_portfolios(
+            scenario.homes, [f.id for f in firms], self.population().ownership_curve, self.seed
+        )
+        scenario = replace(scenario, insurance_assignments=tuple(assignments.items()))
+        world = EnvironmentFactory.from_scenario(
+            scenario,
             disasters=self.disasters(),
             insurers=firms,
             insurer_agents={f.id: InsurancePlanAgent(quotes) for f in firms},
-            agent_factory=lambda _: HouseAgent(insurance_policy=cheapest_affordable_coverage),
+            agent_factory=lambda _: HouseAgent(
+                insurance_policy=lambda observation: assigned_affordable_coverage(
+                    observation, assignments
+                )
+            ),
         )
         world.open_insurance()
         return world

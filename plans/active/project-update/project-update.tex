@@ -46,7 +46,7 @@
 }
 \title{Project Update: Multi-Agent Housing and Insurance Market}
 \author{Neil Dhawan, Jon Legasa, Alejandro Ordonez}
-\date{October 28, 2026}
+\date{October 30, 2026}
 
 \makeatletter
 \renewcommand{\maketitle}{%
@@ -386,7 +386,7 @@ Each agent with $h_i>0$ first owns their residence. Shuffle the remaining owner-
 \end{algorithm}
 
 \section{Insurance coverage and claims}
-Insurers offer homeowners, landlord, and renters coverage. The opening round collects offers and coverage choices before exposure. Fixed quotes and cheapest-affordable purchases provide reference policies for learned pricing and purchasing.
+Insurers offer homeowners, landlord, and renters coverage. The opening round collects offers and coverage choices before exposure. Fixed quotes and ownership--price portfolio assignments provide the current baseline for learned pricing and purchasing.
 
 For a covered claim, let $x\geq0$ be the loss amount, $\delta\geq0$ the deductible, and $L_{\max}\geq0$ the coverage limit. Let $b_f\geq0$ be insurer $f$'s available capital immediately before payment, with $f\in\{1,\ldots,F\}$. All amounts are in dollars.
 
@@ -456,6 +456,30 @@ Owners and tenants may insure different losses at the same home with different f
 \State Activate contracts and return updated balances
 \end{algorithmic}
 \end{algorithm}
+
+\subsection{Implemented initialization: ownership--price insurer portfolios}
+\label{sec:insurance-field}
+The command center identifies insurers as Blue (A), Green (B), and Orange (C). All start with equal capital and retain fixed premiums of 125, 150, and 175 respectively. Opening purchases now use the home's assigned insurer rather than the globally cheapest firm. This initialization is implemented in all three experimental worlds and their regenerated snapshots.
+
+The assignment reuses actual ownership and initial prices; it does not draw a new spatial field or move home titles. For each owner $i$ with at least one home, compute the initial portfolio value
+\begin{equation}
+ W_i=\sum_{a,b:O_{ab}=i}P_{ab}(0).
+\end{equation}
+Rank these owners by $W_i$, breaking ties with a dedicated seeded insurance stream. Let $M$ be the number of such owners. Use the existing ownership Lorenz curve $L_h$, evaluated over the $F$ firms, to obtain
+\begin{equation}
+ w_j=L_h(j/F)-L_h((j-1)/F),\qquad j=1,\ldots,F.
+\end{equation}
+When $M\ge F$, reserve one owner portfolio per firm and allocate the remaining $M-F$ portfolios using $w_j$ and the existing count-rounding and residual-correction procedure. Thus each firm has at least one owner portfolio, and counts sum exactly to $M$. When $M<F$, allocate all $M$ portfolios using the same rounding rule without a reservation; some firms necessarily receive none. These are counts of whole owner portfolios, not target home counts, policy counts, or insured dollar shares. The minimum-one reservation intentionally modifies the raw Lorenz shares.
+
+A seeded permutation assigns stable firm identities to the ordered quotas. Assign consecutive blocks of value-ranked owners to those firms, then define the field
+\begin{equation}
+ I_{ab}=\text{assigned insurer of owner }O_{ab}.
+\end{equation}
+Every home owned by the same person therefore has the same assigned insurer, including geographically separated rental properties. Higher-ranked blocks contain higher-value ownership portfolios; firm color is not an intrinsic wealth rank. In ``Peace'', $L_h(p)=p$ and equal values use seeded ties, giving nearly equal portfolio counts. ``Standard'' and ``Chaos'' share the same ownership, prices, seed, and insurer field. The field is independent of disaster sampling and stays fixed after damage.
+
+Owners and renters purchase their eligible products from the assigned insurer if they can afford the premium. Building and contents coverage remain distinct contracts at the same home. Purchases proceed in home-ID order within each person's cash budget. An unaffordable assigned offer results in no contract, with no fallback to a cheaper competing firm. Firms receive premiums and pay capital-limited claims through the existing insurance settlement rules. Assignment does not guarantee active coverage or equal exposure, and insurers do not become owners of the homes.
+
+Snapshots record the home-to-insurer mapping and initialization version. The command center's insurer-portfolio layer displays the initial assignment separately from active coverage; firm controls show current policy counts. The dropdown separates ownership and resident views: in ownership view, fills and IDs identify owners, including rented homes; in resident view, fills and IDs identify current occupants. Each person has a stable unique hex color across both views. Home borders are neutral by default. Selecting an insurer highlights its assigned homes with that firm's Blue, Green, or Orange border while all other homes remain fully visible; only one insurer is selected at a time. Clearing the selection restores neutral borders. Portfolio highlights persist after damage or coverage expiry and do not assert an active contract; the Coverage view highlights only current coverage. Existing ownership and price maps, initial capital budgets, and disaster streams are preserved. The previous cheapest-affordable policy remains available as a separate baseline, but is no longer the initialization used by these three worlds.
 
 \section{Disaster occurrence and damage}
 Each disaster affects a fixed rectangular zone. Intact homes within it lose all modeled value and become uninhabitable; homes outside it are unaffected.

@@ -133,6 +133,12 @@ class WorldRecorder:
             for c in self.world.contracts
         ]
         return dict(
+            insurance_initialization=(
+                "ownership-price-portfolios-v1"
+                if self.world.insurance_assignments
+                else "unassigned"
+            ),
+            insurance_assignments=dict(self.world.insurance_assignments),
             frames=self.frames,
             contracts=contracts,
             timing="Period 0 is after opening premiums; other periods are end-of-period. "

@@ -182,3 +182,19 @@ def test_quote_cannot_impersonate_another_insurer() -> None:
     with pytest.raises(ValueError, match="own offers"):
         env.open_insurance()
     assert not env.contracts
+
+
+def test_assigned_policy_does_not_fall_back_to_cheaper_competitor():
+    from agents.policies import assigned_affordable_coverage
+    from domain.insurance import InsuranceObservation
+    from domain.models import Entity, Home
+
+    home = Home(id=1, region_id=1, owner_id=1, occupant_id=1, market_value=Decimal(1000))
+    offers = (
+        Offer(1, 1, Product.HOMEOWNERS, Decimal(10), Decimal(1000)),
+        Offer(2, 2, Product.HOMEOWNERS, Decimal(20), Decimal(1000)),
+    )
+    poor = InsuranceObservation(Entity(1, Decimal(15), Decimal(0)), (home,), offers)
+    assert assigned_affordable_coverage(poor, {1: 2}) == ()
+    funded = InsuranceObservation(Entity(1, Decimal(30), Decimal(0)), (home,), offers)
+    assert assigned_affordable_coverage(funded, {1: 2}) == (CoverageChoice(2, 1),)

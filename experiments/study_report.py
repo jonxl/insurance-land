@@ -301,8 +301,9 @@ def generate(output: Path, *, draws: int = 20000, field_samples: int = 500) -> N
             "These charts use the exact snapshots shown in "
             "diagnostics. Destroyed-home and displacement lines overlap because everyone starts "
             "housed and there is no relocation or rebuilding. The gap between claims due and paid "
-            "is a capital shortfall, not uninsured property loss. Fixed cheapest-affordable "
-            "purchases concentrate coverage at Firm A; idle competitors keep their capital. "
+            "is a capital shortfall, not uninsured property loss. Coverage follows existing "
+            "ownership portfolios ranked by initial property value; all three insurers "
+            "receive assigned portfolios. "
             "One seeded trajectory illustrates behavior, not a general economic conclusion.",
         )
         summary = {
@@ -349,26 +350,27 @@ def generate(output: Path, *, draws: int = 20000, field_samples: int = 500) -> N
 body{max-width:1200px;
 margin:28px auto;
 padding:0 20px;
-font:15px/1.6 system-ui;
-color:#24313a}
-h1,h2{text-wrap:balance}p{text-wrap:pretty}header{display:flex;
+font:18px/1.7 Georgia,"Palatino Linotype",Palatino,"Times New Roman",serif;
+background:#f7f3ed;
+color:#352b25}
+h1,h2{font-weight:400;text-wrap:balance}strong,b{font-weight:500}h1{font-style:italic;font-weight:400}header,nav{flex-wrap:wrap;gap:16px}p{text-wrap:pretty}header{display:flex;
 justify-content:space-between;
 align-items:center}
-a{color:#245b91}button{font:inherit;
-background:white;
-border:1px solid #d8dfe3;
+a{color:#634735}button{font:inherit;
+background:#fffcf7;
+border:1px solid #d6c9ba;
 border-radius:5px;
 padding:6px 16px;
 cursor:pointer}
-button[aria-pressed=true]{background:#eaf2f8;
-border-color:#245b91;
-color:#245b91}
-button:focus-visible{outline:2px solid #245b91;
+button[aria-pressed=true]{background:#e8ded1;
+border-color:#634735;
+color:#634735}
+button:focus-visible{outline:2px solid #634735;
 outline-offset:3px}nav{display:flex;
 gap:8px;
 margin:22px 0}
 figure{margin:28px 0 40px}img{width:100%;
-display:block}figcaption,.facts{color:#53616b}
+display:block}figcaption,.facts{color:#796858}
 .facts{font-variant-numeric:tabular-nums}.world-section[hidden]{display:none}
 </style><header><h1>Insurance Land</h1><a href="diagnostics.html">Open diagnostics →</a></header>
 <p>The same five checks for “Peace”, “Standard”, and “Chaos”: initial geography, resource
