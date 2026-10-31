@@ -104,6 +104,16 @@ class WorldRecorder:
                     dict(id=f.id, name=f.name, capital=str(f.capital))
                     for f in world.insurers.values()
                 ],
+                actions=[]
+                if result is None
+                else [
+                    dict(
+                        person=outcome.person_id,
+                        action=type(outcome.action).__name__,
+                        paid=outcome.paid,
+                    )
+                    for outcome in result.actions
+                ],
                 transfers=transfers,
                 events=[]
                 if result is None

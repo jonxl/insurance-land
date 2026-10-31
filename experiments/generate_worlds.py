@@ -5,6 +5,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
+from experiments.diagnostic_fields import diagnostic_fields
 from experiments.recording import WorldRecorder
 from experiments.worlds import WorldSpec
 
@@ -20,6 +21,7 @@ def generate(
         for rate in spec.rates():
             recorder.step(disaster_rate=rate)
         data = recorder.data()
+        data["diagnostics"] = diagnostic_fields(spec)
         data["configuration"] = asdict(spec)
         data["rates"] = spec.rates()
         worlds[name] = data

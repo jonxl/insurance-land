@@ -9,6 +9,7 @@ from threading import Lock, Thread
 from urllib.parse import urlsplit
 from uuid import uuid4
 
+from experiments.diagnostic_fields import diagnostic_fields
 from experiments.recording import WorldRecorder
 from experiments.worlds import WorldSpec
 
@@ -35,7 +36,7 @@ def run_experiment(spec: WorldSpec, output: Path) -> None:
     for rate in spec.rates():
         recorder.step(disaster_rate=rate)
     data = recorder.data()
-    data.update(configuration=asdict(spec), rates=spec.rates())
+    data.update(configuration=asdict(spec), rates=spec.rates(), diagnostics=diagnostic_fields(spec))
     serialized = json.dumps({"worlds": {spec.name: data}, "default": spec.name})
     (output / "assets").mkdir(parents=True)
     (output / "assets/world-history.json").write_text(serialized)

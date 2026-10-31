@@ -346,33 +346,42 @@ def generate(output: Path, *, draws: int = 20000, field_samples: int = 500) -> N
     (output / "assets" / "study-summary.json").write_text(json.dumps(summaries, indent=2) + "\n")
     html = """<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Insurance Land · World studies</title><style>
-body{max-width:1200px;
-margin:28px auto;
-padding:0 20px;
-font:18px/1.7 Georgia,"Palatino Linotype",Palatino,"Times New Roman",serif;
-background:#f7f3ed;
-color:#352b25}
-h1,h2{font-weight:400;text-wrap:balance}strong,b{font-weight:500}h1{font-style:italic;font-weight:400}header,nav{flex-wrap:wrap;gap:16px}p{text-wrap:pretty}header{display:flex;
-justify-content:space-between;
-align-items:center}
-a{color:#634735}button{font:inherit;
-background:#fffcf7;
-border:1px solid #d6c9ba;
-border-radius:5px;
-padding:6px 16px;
-cursor:pointer}
-button[aria-pressed=true]{background:#e8ded1;
-border-color:#634735;
-color:#634735}
-button:focus-visible{outline:2px solid #634735;
-outline-offset:3px}nav{display:flex;
-gap:8px;
-margin:22px 0}
-figure{margin:28px 0 40px}img{width:100%;
-display:block}figcaption,.facts{color:#796858}
-.facts{font-variant-numeric:tabular-nums}.world-section[hidden]{display:none}
-</style><header><h1>Insurance Land</h1><a href="diagnostics.html">Open diagnostics →</a></header>
+<title>Insurance Land World Studies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,200..900&display=swap">
+<style>
+:root{color-scheme:light;--page:#f8f2e8;--ink:#2e1c12;--muted:#6b5848}
+*{box-sizing:border-box}
+body{margin:0;font:17px/1.6 "Source Serif 4",Georgia,"Times New Roman",serif;
+background:var(--page);color:var(--ink)}
+h1,h2{margin:0;text-wrap:balance;font-weight:600}
+p{text-wrap:pretty}
+a{color:inherit}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;
+gap:8px 32px;max-width:1200px;margin:0 auto;padding:16px 24px 0}
+h1{font-size:40px;line-height:1.1}
+main{max-width:1200px;margin:0 auto;padding:16px 24px 24px}
+main>p{max-width:72ch}
+nav{display:inline-flex;flex-wrap:wrap;gap:2px;padding:2px;margin:18px 0;background:#ece1cf;
+border-radius:8px}
+button{font:inherit;font-size:15px;color:inherit;background:transparent;border:0;
+border-radius:6px;padding:5px 14px;cursor:pointer}
+button:hover{background:#e0d3c0}
+button[aria-pressed=true]{background:var(--ink);color:#fff}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+summary{cursor:pointer;color:var(--muted)}
+h2{font-size:26px;line-height:1.2}
+figure{margin:28px 0 40px}
+img{width:100%;display:block;background:#fff;border-radius:4px}
+figcaption,.facts{color:var(--muted)}
+figcaption{margin-top:8px;font-size:15px;max-width:80ch}
+.facts{font-variant-numeric:tabular-nums}
+.world-section[hidden]{display:none}
+@media(max-width:640px){header,main{padding-inline:16px}h1{font-size:32px}}
+</style><header><h1>Insurance Land</h1><a href="diagnostics.html">Open command center</a></header>
+<main>
 <p>The same five checks for “Peace”, “Standard”, and “Chaos”: initial geography, resource
 allocations,
 noise and prices, disaster sampling, and recorded outcomes. Switch worlds to compare their
@@ -405,7 +414,8 @@ document.querySelectorAll('[data-world]').forEach(b=>b.setAttribute('aria-presse
 history.replaceState(null,'','#'+name);}
 document.querySelectorAll('[data-world]').forEach(b=>b.onclick=()=>choose(b.dataset.world));
 choose(['peace','standard','chaos'].includes(location.hash.slice(1))?location.hash.slice(1):'standard');
-</script></html>"""
+addEventListener('load',()=>scrollTo(0,0));
+</script></main></html>"""
     )
     (output / "index.html").write_text(html)
 
