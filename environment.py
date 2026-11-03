@@ -30,6 +30,7 @@ class Scenario:
     homes: tuple[Home, ...]
     grid_shape: tuple[int, int] | None = None
     seed: int = 0
+    insurance_assignments: tuple[tuple[int, int], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +90,12 @@ class Environment:
         self._period = 0
         self._grid_shape = scenario.grid_shape
         self._seed = scenario.seed
+        self.insurance_assignments = MappingProxyType(dict(scenario.insurance_assignments))
+        if self.insurance_assignments and (
+            set(self.insurance_assignments) != set(self.homes)
+            or not set(self.insurance_assignments.values()) <= {firm.id for firm in insurers}
+        ):
+            raise ValueError("Insurance assignments must map every home to an existing firm")
         self._disasters = disasters
         if self._grid_shape is not None:
             grid_snapshot(self.homes.values(), self._grid_shape)
@@ -100,6 +107,11 @@ class Environment:
                 or disasters.footprint_columns > self._grid_shape[1]
             ):
                 raise ValueError("Disaster footprint must fit within the grid")
+        self._risk_probabilities = (
+            disasters.risk_probabilities(self._grid_shape, seed=self._seed)
+            if disasters is not None and self._grid_shape is not None
+            else None
+        )
         self._insurance = InsuranceMarket(insurers)
         self._insurer_agents = dict(insurer_agents or {})
         if self._insurer_agents.keys() != self._insurance.firms.keys():
@@ -264,7 +276,10 @@ class Environment:
         claims: list[Claim] = []
         if disaster_config is not None and self._grid_shape is not None:
             for cells in disaster_config.footprints(
-                self._grid_shape, seed=self._seed, period=period
+                self._grid_shape,
+                seed=self._seed,
+                period=period,
+                probabilities=self._risk_probabilities,
             ):
                 losses = market.destroy(cells)
                 disaster_results.append(DisasterResult(cells, losses))

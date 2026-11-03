@@ -1,0 +1,33 @@
+{
+  "world": {
+    "seed": 42,
+    "rows": 16,
+    "columns": 16,
+    "periods": 120,
+    "rate": 0.5
+  },
+  "numpy": "2.5.4",
+  "matplotlib": "3.11.2",
+  "python": "3.14.7",
+  "diagnostic_periods": 20000,
+  "field_samples": 500,
+  "annual_income_total": "12800000.00",
+  "home_count": 256,
+  "ownership_total": 256,
+  "contracts": 357,
+  "poisson_mean": 0.49635,
+  "poisson_variance": 0.49828667750000005,
+  "expected_poisson_mean_variance": 0.5,
+  "anchor_total_variation": 0.04914861646293227,
+  "home_hit_max_absolute_error": 0.002926553866941288,
+  "smoothed_center_mean": -0.08467939745602579,
+  "smoothed_center_variance": 0.9997989949002513,
+  "final_destroyed": 158,
+  "claims_due": 43040110.18,
+  "claims_paid": 10044625.0,
+  "limitations": [
+    "Current per-period income/rent timing; report's 10/20-run schedule pending",
+    "Public event history is not yet delivered to agent observations",
+    "Fixed baseline policies, no Q-learning; illustrative uncalibrated parameters"
+  ]
+}

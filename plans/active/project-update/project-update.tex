@@ -46,7 +46,7 @@
 }
 \title{Project Update: Multi-Agent Housing and Insurance Market}
 \author{Neil Dhawan, Jon Legasa, Alejandro Ordonez}
-\date{October 28, 2026}
+\date{October 30, 2026}
 
 \makeatletter
 \renewcommand{\maketitle}{%
@@ -103,24 +103,24 @@ Disasters produce losses across neighboring homes, exposing owners, residents, a
 
 \begin{itemize}
 \item \textbf{Agents and objectives.} Individual and insurer agents use Q-learning to maximize expected discounted cumulative rewards. Renter, owner-occupier, and landlord are housing relationships, not fixed agent types.
-\item \textbf{Housing and allocation.} Each grid cell is one home. The population and housing supply are fixed and equal, with one resident per home initially. Ownership is separate from residence and may be concentrated. Initial allocation does not enforce affordability. Initial prices are positive; rent and starting capital are configured separately.
+\item \textbf{Housing and allocation.} Each grid cell is a region, not a home. Every region holds at least one home, larger regions hold more homes, and region sizes follow a smoothed spatial field. Homes in a region share its location, and their initial prices vary around the regional mean, and they have no separate positions inside it. Agents are tied to homes rather than to cells. The population and housing supply are fixed and equal, with one resident per home initially. Ownership is separate from residence and may be concentrated. Initial allocation does not enforce affordability. Initial prices are positive; rent and starting capital are configured separately.
 \item \textbf{Income and inequality.} External income is assigned once, accrues each period, and is paid every 10 completed simulation runs; landlords receive accrued rent every 20 completed runs. Section~\ref{sec:payment-schedule} defines the payment clock. Jobs are not simulated. Income and ownership curves share a agent ranking. Recurring income adds money to the economy. ``Peace'' imposes equal initial resources, with no ongoing wealth cap or redistribution.
-\item \textbf{Spatial fields.} Seeded noise generates initial prices and a separate disaster-risk field. The risk field is independent of initial prices and remains fixed during an episode. Spatial boundaries do not wrap. A global seed supplies separate random streams for reproducible runs.
-\item \textbf{Disaster occurrence.} Each period, draw the number of disasters from a Poisson distribution. Choose each disaster location independently using the hidden risk map. Every event affects a rectangle of the same size, entirely within the grid. The event rate may change over time; the risk map and rectangle size stay fixed.
+\item \textbf{Spatial fields.} Seeded noise generates initial prices, region sizes, and a disaster-risk field. These three fields are independent of one another and remain fixed during an episode. Spatial boundaries do not wrap. A global seed supplies separate random streams for reproducible runs.
+\item \textbf{Disaster occurrence.} Each period, draw the number of disasters from a Poisson distribution. Choose each disaster's center independently using the hidden risk map. Draw its size independently from a Tweedie distribution, so most disasters strike a single region and large ones are rare outliers. Each event affects a square of regions, clipped at the grid edge. The event rate may change over time; the risk map and size distribution stay fixed.
 \item \textbf{Public information.} After each disaster, every agent and insurer observes its time, affected cells, and resulting housing damage across the grid. The underlying risk field and location probabilities are not provided to agents. They can learn about regional risk from the shared event history, including events outside their own holdings.
-\item \textbf{Damage and recovery.} An affected intact home loses all modeled value and becomes uninhabitable. Its resident is displaced and its owner retains title. Surviving land value, rebuilding, and replacement housing are omitted. Repeated damage to an already destroyed home generates no new building loss.
+\item \textbf{Damage and recovery.} Every intact home in an affected region loses all modeled value and becomes uninhabitable. Its resident is displaced and its owner retains title. Surviving land value, rebuilding, and replacement housing are omitted. Repeated damage to an already destroyed home generates no new building loss.
 \item \textbf{Insurance and timing.} Coverage is chosen before exposure, with up-front premiums and fixed contract terms. Income and rent accrue during each run and settle on their scheduled run boundaries; when both are due, income is paid before rent. Disasters and claims continue within each run. Claims use pre-loss building values or specified contents amounts, subject to deductibles, coverage limits, and available insurer capital. Capital shortfalls are recorded; claims are settled after each event.
 \end{itemize}
 
 \section{Environment and notation}
-The $m\times n$ grid contains $H=mn$ homes, $N=H$ agents, and $F$ insurers. Matrices index homes by location; vectors index agents.
+The $m\times n$ grid contains $mn$ regions, $H$ homes, $N=H$ agents, and $F$ insurers. Region $(a,b)$ holds $H_{ab}\geq1$ homes, and $\rho$ is the mean number of homes per region. Matrices index regions by location; vectors index homes or agents.
 
 \subsection{Definitions and glossary}
-Let $i$ index agents, $t$ simulation periods, and $(a,b)$ and $(u,v)$ home locations. Their domains are
+Let $i$ index agents, $\omega$ homes, $t$ simulation periods, and $(a,b)$ and $(u,v)$ region locations. Home $\omega$ lies in region $(a_\omega,b_\omega)$. Their domains are
 \begin{equation}
 \begin{aligned}
- m,n,N,F &\in\mathbb{Z}_{>0}, & H&=mn,\\
- i &\in\{1,\ldots,N\}, & t&\in\mathbb{Z}_{\geq0},\\
+ m,n,N,F,\rho &\in\mathbb{Z}_{>0}, & H&=\rho mn=\sum_{a=1}^{m}\sum_{b=1}^{n}H_{ab},\\
+ i &\in\{1,\ldots,N\}, & \omega&\in\{1,\ldots,H\},\qquad t\in\mathbb{Z}_{\geq0},\\
  (a,b),(u,v) &\in\{1,\ldots,m\}\times\{1,\ldots,n\}.
 \end{aligned}
 \end{equation}
@@ -141,34 +141,34 @@ Quantities are current unless stated otherwise.
 \endhead
 \bottomrule
 \endfoot
-$P$ & $\mathbb{R}_{\geq0}^{m\times n}$. Home values. \\
-$O$ & $\{1,\ldots,N\}^{m\times n}$. Owners, represented by agent indices. \\
-$R$ & $\{0,\ldots,N\}^{m\times n}$. Residents; zero denotes vacancy. \\
-$D$ & $\{0,1\}^{m\times n}$. Destruction indicators; one denotes an uninhabitable home. \\
+$P$ & $\mathbb{R}_{\geq0}^{H}$. Home values. \\
+$O$ & $\{1,\ldots,N\}^{H}$. Owners, represented by agent indices. \\
+$R$ & $\{0,\ldots,N\}^{H}$. Residents; zero denotes vacancy. \\
+$D$ & $\{0,1\}^{H}$. Destruction indicators; one denotes an uninhabitable home. \\
 $\mathbf{y}$ & $\mathbb{R}_{\geq0}^{N}$. Fixed annual external incomes. \\
 $\mathbf{c}$ & $\mathbb{R}_{\geq0}^{N}$. Cash balances. \\
 \end{longtable}
 
-Initially, $P\in\mathbb{R}_{>0}^{m\times n}$, $D=0$, and each agent appears once in $R$. Ownership indices may repeat. A tenancy occurs where $R_{ab}>0$ and $R_{ab}\ne O_{ab}$. After displacement, a agent may have no residence.
+Initially, $P\in\mathbb{R}_{>0}^{H}$, $D=0$, and each agent appears once in $R$. Ownership indices may repeat. A tenancy occurs where $R_\omega>0$ and $R_\omega\ne O_\omega$. After displacement, a agent may have no residence.
 
-The ownership indicator $\mathbf{1}_{\{O_{ab}=i\}}$ identifies homes belonging to agent $i$. Their home count and property wealth are
+The ownership indicator $\mathbf{1}_{\{O_\omega=i\}}$ identifies homes belonging to agent $i$. Their home count and property wealth are
 \begin{equation}
 \begin{aligned}
- \text{home count of agent }i &= \sum_{a=1}^{m}\sum_{b=1}^{n}\mathbf{1}_{\{O_{ab}=i\}},\\
- \text{property wealth of agent }i &= \sum_{a=1}^{m}\sum_{b=1}^{n}P_{ab}\mathbf{1}_{\{O_{ab}=i\}}.
+ \text{home count of agent }i &= \sum_{\omega=1}^{H}\mathbf{1}_{\{O_\omega=i\}},\\
+ \text{property wealth of agent }i &= \sum_{\omega=1}^{H}P_\omega\mathbf{1}_{\{O_\omega=i\}}.
 \end{aligned}
 \end{equation}
 
 \begingroup
 \makeatletter\def\@captype{figure}\makeatother
 \[
-\underbrace{\begin{bmatrix}200&300\\400&500\end{bmatrix}}_{P\text{ (thousands)}}
+\underbrace{\begin{bmatrix}200&300&400&500\end{bmatrix}}_{P\text{ (thousands)}}
 \qquad
-\underbrace{\begin{bmatrix}3&4\\3&4\end{bmatrix}}_{O\text{ (owners)}}
+\underbrace{\begin{bmatrix}3&4&3&4\end{bmatrix}}_{O\text{ (owners)}}
 \qquad
-\underbrace{\begin{bmatrix}1&2\\3&4\end{bmatrix}}_{R\text{ (residents)}}
+\underbrace{\begin{bmatrix}1&2&3&4\end{bmatrix}}_{R\text{ (residents)}}
 \]
-\caption{Illustrative allocation: agents 1 and 2 rent from 3 and 4. Each owner holds two homes, worth 600 and 800 thousand respectively.}
+\caption{Illustrative allocation of four homes, listed by $\omega$: agents 1 and 2 rent from 3 and 4. Each owner holds two homes, worth 600 and 800 thousand respectively.}
 \label{fig:matrices}
 \endgroup
 
@@ -223,6 +223,12 @@ $q$ & $\mathbb{Z}_{\geq0}$. Completed simulation runs in a payment sequence; eac
 $I_q,J_q$ & $\{0,1\}$. Income and rent payment indicators at run boundary $q$, defined in Section~\ref{sec:payment-schedule}. \\
 $p_0$ & $\mathbb{R}_{>0}$. Reference home price. \\
 $\sigma,\ell$ & $\mathbb{R}_{\geq0}$. Log-price variation and spatial smoothing scale. \\
+$\rho$ & $\mathbb{Z}_{>0}$. Mean homes per region. \\
+$\sigma_h,W_\omega$ & $\mathbb{R}_{\geq0}$ and $\mathbb{R}$. Log-price spread among homes in a region, and home $\omega$'s price noise. \\
+$\zeta,\ell_{\mathrm{size}}$ & $\mathbb{R}_{\geq0}$. Region-size contrast and spatial smoothing scale. \\
+$H_{ab}$ & $\mathbb{Z}_{>0}$. Homes in region $(a,b)$, defined in Section~\ref{sec:region-sizes}. \\
+$Y_e,r_e$ & $\mathbb{R}_{\geq0}$ and $\mathbb{Z}_{\geq0}$. Tweedie draw and radius of disaster $e$, defined in Section~\ref{sec:disaster-size}. \\
+$\mu_r,\phi$ & $\mathbb{R}_{>0}$. Mean and dispersion of the Tweedie draw, set to $0.3$ and $1.5$. \\
 $\tau$ & $\mathbb{R}_{\geq0}$. Noise strength for residence placement. \\
 $\lambda_t$ & $\mathbb{R}_{\geq0}$. Expected disasters in period $t$. \\
 $S$ & $\mathbb{Z}_{\geq0}$. Global seed for labeled component random streams. \\
@@ -234,14 +240,14 @@ Agents are indexed by nondecreasing income, with seeded tie-breaking.
 
 \section{Assigning initial home values}
 \label{sec:home-values}
-Let $E\in\mathbb{R}^{m\times n}$ be the seeded noise matrix used to generate home prices:
+Prices vary by region, and every home in a region starts at that region's price. Let $E\in\mathbb{R}^{m\times n}$ be the seeded noise matrix used to generate them:
 \begin{equation}
  E_{ab}\overset{\mathrm{iid}}{\sim}\mathcal{N}(0,1).
 \end{equation}
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.48\textwidth]{initial-prices.pdf}
-\caption{Each cell is one home; color shows its initial price generated from seeded spatial noise. Example: $m=n=16$, $S=42$, $p_0=250{,}000$, $\sigma=0.4$, $\ell=2$.}
+\caption{Each cell is one region; color shows the mean initial price of its homes, generated from seeded spatial noise. Example: $m=n=8$, $S=42$, $p_0=250{,}000$, $\sigma=0.4$, $\ell=2$.}
 \label{fig:price-distribution}
 \end{figure}
 
@@ -257,22 +263,53 @@ Let $E\in\mathbb{R}^{m\times n}$ be the seeded noise matrix used to generate hom
 \end{equation}
 The scale $\ell$ controls neighborhood size; normalization gives unit variance at each cell. Set $\mathcal{S}_0(E)=E$ for no smoothing.
 
-Using reference price $p_0$ and log-price spread $\sigma$, the initial price matrix is
+Using reference price $p_0$ and log-price spread $\sigma$, the regional price matrix $\bar{P}\in\mathbb{R}_{>0}^{m\times n}$ and initial home prices are
 \begin{equation}
- P=p_0\exp\left(\sigma\mathcal{S}_{\ell}(E)\right).
+\begin{aligned}
+ \bar{P}&=p_0\exp\left(\sigma\mathcal{S}_{\ell}(E)\right),\\[4pt]
+ P_\omega&=\bar{P}_{a_\omega b_\omega}\,\frac{H_{a_\omega b_\omega}\exp(\sigma_h W_\omega)}{\sum_{\omega':(a_{\omega'},b_{\omega'})=(a_\omega,b_\omega)}\exp(\sigma_h W_{\omega'})},\quad W_\omega\overset{\mathrm{iid}}{\sim}\mathcal{N}(0,1).
+\end{aligned}
 \end{equation}
 \begin{algorithm}[H]
 \caption{Generate initial home values}
 \label{alg:prices}
 \begin{algorithmic}[1]
-\Require Grid dimensions, $p_0,\sigma,\ell$, and seeded price stream
+\Require Grid dimensions, region sizes, $p_0,\sigma,\ell$, and seeded price stream
 \State Draw $E_{ab}\overset{\mathrm{iid}}{\sim}\mathcal{N}(0,1)$
-\State $P\gets p_0\exp\bigl(\sigma\mathcal{S}_{\ell}(E)\bigr)$; $D\gets0$
+\State $\bar{P}\gets p_0\exp\bigl(\sigma\mathcal{S}_{\ell}(E)\bigr)$; draw $W_\omega$ and set $P_\omega$ by the equation above; $D\gets0$
 \State \Return $P,D$
 \end{algorithmic}
 \end{algorithm}
 
-The entrywise exponential gives positive prices with median $p_0$ at each cell. Prices are independent of population allocation and rounded to cents.
+The entrywise exponential gives positive regional prices with median $p_0$ at each cell. Homes in one region have different prices, and this is an assumption: $\sigma_h\geq0$ sets their log-price spread, $0.2$ by default, and the normalization makes each region's mean home price equal $\bar{P}_{ab}$ exactly, before rounding. A region with one home has price $\bar{P}_{ab}$. Prices are independent of population allocation and rounded to cents.
+
+\section{Assigning homes to regions}
+\label{sec:region-sizes}
+Earlier versions placed one home, and so one agent, in every grid cell. We now treat each cell as a region whose size is its number of homes. This is a modeling assumption: size and home count are the same quantity here, so land area is not modeled separately. The command center therefore draws the map as a treemap: each region's area is proportional to its home count, regions keep their relative grid positions, and each region shows the mean of the selected quantity over its homes.
+
+Let $G\in\mathbb{R}^{m\times n}$ be seeded noise independent of price and risk noise, $\zeta\geq0$ the region-size contrast, and $\ell_{\mathrm{size}}\geq0$ its smoothing scale. Reusing $\mathcal{S}$ from Section~\ref{sec:home-values}, define the weights $A$ and the extra homes $X$ beyond each region's first:
+\begin{equation}
+\begin{aligned}
+ G_{ab}&\overset{\mathrm{iid}}{\sim}\mathcal{N}(0,1),
+ & &\text{size noise},\\[5pt]
+ A_{ab}&=\exp\!\left(\zeta[\mathcal{S}_{\ell_{\mathrm{size}}}(G)]_{ab}\right),
+ & &\text{size weight},\\[5pt]
+ X_{ab}&\approx(H-mn)\,\dfrac{A_{ab}}{\displaystyle\sum_{u=1}^{m}\sum_{v=1}^{n}A_{uv}},
+ & &\text{extra homes},\\[8pt]
+ H_{ab}&=1+X_{ab},
+ & &\text{homes in the region}.
+\end{aligned}
+\end{equation}
+The whole-number counts $X_{ab}$ use the rounding and residual correction of Algorithm~\ref{alg:incomes}, so $\sum_{a,b}H_{ab}=H$ exactly and every region keeps at least one home. Smoothing keeps neighboring regions similar in size, so dense clusters form. At $\zeta=0$ every region holds $\rho$ homes, and at $\rho=1$ every region holds one home, which recovers the earlier grid.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{region-sizes.pdf}
+\caption{Illustrative region sizes. Example: $m=n=8$, $\rho=4$, $H=256$, $\zeta=1$, $\ell_{\mathrm{size}}=2$.}
+\label{fig:region-sizes}
+\end{figure}
+
+Homes have no positions inside a region, so a disaster strikes all of a region's homes or none of them. All three worlds share the same region sizes.
 
 
 
@@ -378,7 +415,7 @@ Each agent with $h_i>0$ first owns their residence. Shuffle the remaining owner-
 \begin{algorithmic}[1]
 \Require $P,\mathbf{y},\mathbf{h},\tau$ and seeded placement and ownership streams
 \State Compute income percentiles $\mathbf{r}$ and draw $z_i\overset{\mathrm{iid}}{\sim}\mathcal{N}(0,1)$
-\State Match agents ranked by $q_i=r_i+\tau z_i$ to cells ranked by price, filling $R$
+\State Match agents ranked by $q_i=r_i+\tau z_i$ to homes ranked by price, filling $R$
 \State Give each agent with $h_i>0$ ownership of their residence
 \State Shuffle residual owner-capacity slots and assign remaining titles, filling $O$
 \State \Return $R,O$
@@ -386,7 +423,7 @@ Each agent with $h_i>0$ first owns their residence. Shuffle the remaining owner-
 \end{algorithm}
 
 \section{Insurance coverage and claims}
-Insurers offer homeowners, landlord, and renters coverage. The opening round collects offers and coverage choices before exposure. Fixed quotes and cheapest-affordable purchases provide reference policies for learned pricing and purchasing.
+Insurers offer homeowners, landlord, and renters coverage. The opening round collects offers and coverage choices before exposure. Fixed quotes and ownership--price portfolio assignments provide the current baseline for learned pricing and purchasing.
 
 For a covered claim, let $x\geq0$ be the loss amount, $\delta\geq0$ the deductible, and $L_{\max}\geq0$ the coverage limit. Let $b_f\geq0$ be insurer $f$'s available capital immediately before payment, with $f\in\{1,\ldots,F\}$. All amounts are in dollars.
 
@@ -401,10 +438,10 @@ Let $C_{\mathrm{due}}$ denote the contractual payment, $C_{\mathrm{paid}}$ the a
  & &\text{capital shortfall}.
 \end{aligned}
 \end{equation}
-For a claim on home $(a,b)$, let $P_{ab}^{\mathrm{pre}}$ be its value immediately before destruction and $v_{\mathrm{contents}}\geq0$ the contract's contents-loss amount. Under the total-loss rule,
+For a claim on home $\omega$, let $P_{\omega}^{\mathrm{pre}}$ be its value immediately before destruction and $v_{\mathrm{contents}}\geq0$ the contract's contents-loss amount. Under the total-loss rule,
 \begin{equation}
  x=\begin{cases}
- P_{ab}^{\mathrm{pre}}, & \text{homeowners or landlord building claim},\\[4pt]
+ P_{\omega}^{\mathrm{pre}}, & \text{homeowners or landlord building claim},\\[4pt]
  v_{\mathrm{contents}}, & \text{renters contents claim}.
  \end{cases}
 \end{equation}
@@ -457,8 +494,32 @@ Owners and tenants may insure different losses at the same home with different f
 \end{algorithmic}
 \end{algorithm}
 
+\subsection{Implemented initialization: ownership--price insurer portfolios}
+\label{sec:insurance-field}
+The command center identifies insurers as Red (A), Green (B), and Blue (C). All start with equal capital and retain fixed premiums of 125, 150, and 175 respectively. Opening purchases now use the home's assigned insurer rather than the globally cheapest firm. This initialization is implemented in all three experimental worlds and their regenerated snapshots.
+
+The assignment reuses actual ownership and initial prices; it does not draw a new spatial field or move home titles. For each owner $i$ with at least one home, compute the initial portfolio value
+\begin{equation}
+ W_i=\sum_{\omega:O_\omega=i}P_\omega(0).
+\end{equation}
+Rank these owners by $W_i$, breaking ties with a dedicated seeded insurance stream. Let $M$ be the number of such owners. Use the existing ownership Lorenz curve $L_h$, evaluated over the $F$ firms, to obtain
+\begin{equation}
+ w_j=L_h(j/F)-L_h((j-1)/F),\qquad j=1,\ldots,F.
+\end{equation}
+When $M\ge F$, reserve one owner portfolio per firm and allocate the remaining $M-F$ portfolios using $w_j$ and the existing count-rounding and residual-correction procedure. Thus each firm has at least one owner portfolio, and counts sum exactly to $M$. When $M<F$, allocate all $M$ portfolios using the same rounding rule without a reservation; some firms necessarily receive none. These are counts of whole owner portfolios, not target home counts, policy counts, or insured dollar shares. The minimum-one reservation intentionally modifies the raw Lorenz shares.
+
+A seeded permutation assigns stable firm identities to the ordered quotas. Assign consecutive blocks of value-ranked owners to those firms, then define the field
+\begin{equation}
+ I_\omega=\text{assigned insurer of owner }O_\omega.
+\end{equation}
+Every home owned by the same person therefore has the same assigned insurer, including geographically separated rental properties. Higher-ranked blocks contain higher-value ownership portfolios; firm color is not an intrinsic wealth rank. In ``Peace'', $L_h(p)=p$ and equal values use seeded ties, giving nearly equal portfolio counts. ``Standard'' and ``Chaos'' share the same ownership, prices, seed, and insurer field. The field is independent of disaster sampling and stays fixed after damage.
+
+Owners and renters purchase their eligible products from the assigned insurer if they can afford the premium. Building and contents coverage remain distinct contracts at the same home. Purchases proceed in home-ID order within each person's cash budget. An unaffordable assigned offer results in no contract, with no fallback to a cheaper competing firm. Firms receive premiums and pay capital-limited claims through the existing insurance settlement rules. Assignment does not guarantee active coverage or equal exposure, and insurers do not become owners of the homes.
+
+Snapshots record the home-to-insurer mapping and initialization version. The command center's insurer-portfolio layer displays the initial assignment separately from active coverage; firm controls show current policy counts. The dropdown separates ownership and resident views: in ownership view, fills and IDs identify owners, including rented homes; in resident view, fills and IDs identify current occupants. Each person has a stable unique hex color across both views. Home borders are neutral by default. Selecting an insurer highlights its assigned homes with that firm's Red, Green, or Blue border while all other homes remain fully visible; only one insurer is selected at a time. Clearing the selection restores neutral borders. Portfolio highlights persist after damage or coverage expiry and do not assert an active contract; the Coverage view highlights only current coverage. Existing ownership and price maps, initial capital budgets, and disaster streams are preserved. The previous cheapest-affordable policy remains available as a separate baseline, but is no longer the initialization used by these three worlds.
+
 \section{Disaster occurrence and damage}
-Each disaster affects a fixed rectangular zone. Intact homes within it lose all modeled value and become uninhabitable; homes outside it are unaffected.
+Each disaster affects a square zone of regions, with a random center and a random size. All intact homes in those regions lose all modeled value and become uninhabitable; homes outside it are unaffected.
 
 \begin{figure}[H]
 \centering
@@ -481,12 +542,12 @@ At $\lambda_t=0$, $\Pr(K_t=0)=1$.
 
 \subsection{Hidden spatial risk}
 \label{sec:hidden-risk}
-An anchor is a disaster zone's upper-left cell. Let $\mathcal{A}$ contain anchors whose entire footprint fits within the grid.
+A center is the region in the middle of a disaster zone. Every region can be a center.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.48\textwidth]{hidden-spatial-risk.pdf}
-\caption{Darker purple denotes higher anchor probability. Example: $16\times16$ homes, a $3\times3$ footprint, $14\times14$ eligible anchors, $S=42$, $\eta=1$, $\ell_{\mathrm{risk}}=2$. This risk map is hidden from agents.}
+\caption{Darker purple denotes a higher probability of being the disaster center. Example: $8\times8$ regions, $S=42$, $\eta=1$, $\ell_{\mathrm{risk}}=2$. This risk map is hidden from agents.}
 \label{fig:hidden-spatial-risk}
 \end{figure}
 
@@ -499,27 +560,67 @@ Let $U\in\mathbb{R}^{m\times n}$ be seeded Gaussian noise independent of price n
  & &\text{spatial weight}.
 \end{aligned}
 \end{equation}
-Let $\pi_{ab}$ be the probability of selecting anchor $(a,b)\in\mathcal{A}$, and $\lambda_t(a,b)$ its expected event count in period $t$:
+Let $\pi_{ab}$ be the probability of selecting center $(a,b)$, and $\lambda_t(a,b)$ its expected event count in period $t$:
 \begin{equation}
 \begin{aligned}
- \pi_{ab}&=\dfrac{V_{ab}}{\displaystyle\sum_{(u,v)\in\mathcal{A}}V_{uv}},
+ \pi_{ab}&=\dfrac{V_{ab}}{\displaystyle\sum_{u=1}^{m}\sum_{v=1}^{n}V_{uv}},
  & &\text{location probability},\\[8pt]
  \lambda_t(a,b)&=\lambda_t\pi_{ab},
  & &\text{time--space event intensity}.
 \end{aligned}
 \end{equation}
-Normalization preserves the total rate $\lambda_t$. Draw the Poisson count, then sample anchors independently from $\pi$. At $\eta=0$, anchors are equally likely; larger $\eta$ concentrates events. Overlapping footprints make a home's exposure distinct from any single anchor probability.
+Normalization preserves the total rate $\lambda_t$. Draw the Poisson count, then sample centers independently from $\pi$. At $\eta=0$, centers are equally likely; larger $\eta$ concentrates events. Zones reach past their centers, so a region's exposure, given in Section~\ref{sec:disaster-size}, is larger than its own $\pi_{ab}$.
 
-The field stays fixed throughout an episode. All agents observe event times, footprints, and damage, including events on previously destroyed homes; $U$, $V$, and $\pi$ remain hidden.
+The field stays fixed throughout an episode. All agents observe event times, zones, and damage, including events on previously destroyed homes; $U$, $V$, and $\pi$ remain hidden.
+
+\subsection{Disaster size}
+\label{sec:disaster-size}
+Disaster sizes follow a Tweedie distribution. We previously used a standard normal, but it made zones too large: $31.7\%$ of events reached $3\times3$ or wider, and an average event struck more than four regions. A Tweedie with power between $1$ and $2$ has a point mass at zero, so many disasters have no spread at all, and its dispersion directly limits how often large zones occur. This is an assumption. We fix the power at $3/2$ because the sum below then contains only exponential variables, which keeps the math simple. For event $e$ with center $(u,v)$, let $Y_e$ be its draw, $r_e$ its radius, and $\mathcal{F}_e$ its zone:
+\begin{equation}
+\begin{aligned}
+ M_e&\overset{\mathrm{iid}}{\sim}\mathrm{Poisson}(\psi),\quad \psi=\frac{2\sqrt{\mu_r}}{\phi},
+ & &\text{number of jumps},\\[5pt]
+ Y_e&=\sum_{j=1}^{M_e}J_{ej},\quad J_{ej}\overset{\mathrm{iid}}{\sim}\mathrm{Exponential}(\text{mean }\nu),\quad \nu=\frac{\phi\sqrt{\mu_r}}{2},
+ & &\text{size draw},\\[5pt]
+ r_e&=\lfloor Y_e\rfloor,
+ & &\text{radius in regions},\\[5pt]
+ \mathcal{F}_e&=\bigl\{(a,b):\max\{|a-u|,|b-v|\}\leq r_e\bigr\},
+ & &\text{affected regions}.
+\end{aligned}
+\end{equation}
+Then $\mathbb{E}[Y_e]=\mu_r$ and $\mathrm{Var}(Y_e)=\phi\mu_r^{3/2}$, the defining mean--variance relation of a Tweedie distribution with power $3/2$. Zones have side length $2r_e+1$ and are clipped at the grid edge. Sizes are independent of counts, centers, and the risk field. Lowering $\phi$ makes large zones rarer, and both $\mu_r$ and $\phi$ are settings of each experiment.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{disaster-sizes.pdf}
+\caption{Disaster sizes with $\mu_r=0.3$ and $\phi=1.5$. Left: probability of each zone size. Right: the chance a zone reaches radius $d$, on a logarithmic scale, compared with the earlier standard normal.}
+\label{fig:disaster-sizes}
+\end{figure}
+
+With these values, $90.8\%$ of events strike a single region, an average event strikes $2.04$ regions before clipping, and a zone of $7\times7$ or larger occurs in about 1 of every 448 events. Beyond radius 3 the Tweedie tail decays exponentially, more slowly than the normal's, so it keeps rare outliers while the common sizes shrink.
+
+Because $\lfloor Y\rfloor\geq d$ exactly when $Y\geq d$, a region's exposure can be computed exactly. A sum of $k$ exponential variables exceeds $d$ exactly when fewer than $k$ arrivals of a Poisson process with rate $1/\nu$ occur by time $d$, so for $d\geq1$
+\begin{equation}
+ \xi(d):=\Pr(r_e\geq d)=\sum_{k=1}^{\infty}\frac{e^{-\psi}\psi^{k}}{k!}\sum_{i=0}^{k-1}\frac{e^{-d/\nu}(d/\nu)^{i}}{i!},
+ \qquad \xi(0)=1.
+\end{equation}
+Let $d_{ab,uv}=\max\{|a-u|,|b-v|\}$. The probability that one event strikes region $(a,b)$, and its expected strikes in period $t$, are
+\begin{equation}
+\begin{aligned}
+ \theta_{ab}&=\sum_{u=1}^{m}\sum_{v=1}^{n}\pi_{uv}\,\xi(d_{ab,uv}),\\[8pt]
+ \Lambda_t(a,b)&=\lambda_t\theta_{ab}.
+\end{aligned}
+\end{equation}
+Strikes on a region are Poisson with mean $\Lambda_t(a,b)$, so it is struck at least once in period $t$ with probability $1-\exp(-\Lambda_t(a,b))$. Every home in a region shares this hazard. Larger regions are no more likely to be struck, but more homes and claims are at stake when they are.
 
 \subsection{Damage and claims}
 
-For event $e\in\{1,\ldots,K_t\}$, let $\mathcal{F}_e$ be its affected grid cells. For $(a,b)\in\mathcal{F}_e$ with $D_{ab}=0$, retain pre-loss records and set
+For event $e\in\{1,\ldots,K_t\}$, consider each home $\omega$ with $(a_\omega,b_\omega)\in\mathcal{F}_e$ and $D_\omega=0$. Retain its pre-loss records and set
 \begin{equation}
 \begin{aligned}
- P_{ab}&\gets0,\\[4pt]
- R_{ab}&\gets0,\\[4pt]
- D_{ab}&\gets1.
+ P_\omega&\gets0,\\[4pt]
+ R_\omega&\gets0,\\[4pt]
+ D_\omega&\gets1.
 \end{aligned}
 \end{equation}
 This update displaces the resident and removes the owner's property value while retaining title. Pre-loss values and occupancy determine covered losses. One zone can trigger claims across several owners, tenants, and insurers.
@@ -528,14 +629,15 @@ This update displaces the resident and removes the owner's property value while 
 \caption{Apply disasters and claims}
 \label{alg:disaster}
 \begin{algorithmic}[1]
-\Require $P,O,R,D$, contracts, $\lambda_t$, $\pi$, fixed footprint, and disaster stream
+\Require $P,O,R,D$, contracts, $\lambda_t$, $\pi$, and disaster streams
 \State Draw $K_t\sim\operatorname{Poisson}(\lambda_t)$
 \For{$e\in\{1,\ldots,K_t\}$}
-    \State Sample an anchor from $\pi$ and form footprint $\mathcal{F}_e$
-    \State Retain pre-loss records for footprint cells where $D_{ab}=0$
-    \State For those cells: $P_{ab}\gets0$, $R_{ab}\gets0$, $D_{ab}\gets1$
+    \State Sample a center from $\pi$ and draw $Y_e$ from the Tweedie distribution
+    \State Form zone $\mathcal{F}_e$ with radius $r_e=\lfloor Y_e\rfloor$, clipped at the grid edge
+    \State Retain pre-loss records for homes in $\mathcal{F}_e$ where $D_\omega=0$
+    \State For those homes: $P_\omega\gets0$, $R_\omega\gets0$, $D_\omega\gets1$
     \State Record displacement and settle covered claims; retain ownership
-    \State Publish event time, footprint, and housing damage to all agents
+    \State Publish event time, zone, and housing damage to all agents
 \EndFor
 \end{algorithmic}
 \end{algorithm}
@@ -587,10 +689,10 @@ Fix the population $N$, insurer count $F$, housing supply $H=N$, episode length 
 \end{equation}
 $M_0$ fixes initial cash; recurring income increases it. $Y$ is an annual income budget, not a full GDP measure.
 
-Matched runs share budgets, insurer capital, footprint, risk field, insurance rules, learning configuration, and seeds. All three worlds use the same 10-run income and 20-run rent schedule in Section~\ref{sec:payment-schedule}; comparisons use equal numbers of runs and the same payment-clock phase. Initial cash budgets apply at the start of each independent payment sequence. Vary $\eta$ and $\ell_{\mathrm{risk}}$ separately to test spatial concentration.
+Matched runs share budgets, insurer capital, region sizes, the disaster-size distribution, risk field, insurance rules, learning configuration, and seeds. All three worlds use the same 10-run income and 20-run rent schedule in Section~\ref{sec:payment-schedule}; comparisons use equal numbers of runs and the same payment-clock phase. Initial cash budgets apply at the start of each independent payment sequence. Vary $\eta$ and $\ell_{\mathrm{risk}}$ separately to test spatial concentration.
 
 \subsection{``Peace'': equal initial resources}
-``Peace'' starts every agent with the same income, one home, and the same cash balance. Every home has the same initial price. Let $M_{\mathrm{agents}}:=M_0-\sum_{f=1}^{F}b_f(0)$ be the nonnegative cash budget assigned to agents. For population share $p\in[0,1]$, choose
+``Peace'' starts every agent with the same income, one home, and the same cash balance. Every home has the same initial price, so $\sigma=\sigma_h=0$. Let $M_{\mathrm{agents}}:=M_0-\sum_{f=1}^{F}b_f(0)$ be the nonnegative cash budget assigned to agents. For population share $p\in[0,1]$, choose
 \begin{equation}
 \begin{aligned}
  L_y(p)=L_h(p)&=p,
@@ -599,13 +701,13 @@ Matched runs share budgets, insurer capital, footprint, risk field, insurance ru
  & &\text{income and home allocation},\\[5pt]
  c_i(0)&=\dfrac{M_{\mathrm{agents}}}{N},
  & &\text{equal initial cash},\\[5pt]
- P_{ab}(0)&=p_0,\qquad \sigma=0,
+ P_\omega(0)&=p_0,\qquad \sigma=0,
  & &\text{equal home values}.
 \end{aligned}
 \end{equation}
 Everyone initially owns their residence and has equal wealth. Subsequent decisions and losses may produce inequality; external income remains fixed. There is no wealth cap or redistribution.
 
-``Peace'' shares the constant rate and hidden risk field of ``Standard''. Initial resources are equal; geographic exposure varies.
+``Peace'' shares the constant rate, region sizes, and hidden risk field of ``Standard''. Initial resources are equal; geographic exposure varies.
 
 \subsection{``Standard'': unequal resources and constant risk}
 ``Standard'' uses the Lorenz allocations, spatial prices, and residence assignment above. Tune $L_y,L_h,\sigma,\ell,\tau$ while preserving total income and home count. Initial cash remains equal unless tested separately.
@@ -614,7 +716,7 @@ Let $\bar{\lambda}\in\mathbb{R}_{>0}$ be the selected constant expected event co
 \begin{equation}
  \lambda_t=\bar{\lambda},\qquad t\in\{0,\ldots,T-1\}.
 \end{equation}
-Select $\bar{\lambda}$ relative to episode length and footprint size; numerical calibration remains open.
+Select $\bar{\lambda}$ relative to episode length and the mean disaster size; numerical calibration remains open.
 
 \subsection{``Chaos'': exponentially increasing risk}
 ``Chaos'' shares the initial allocation and spatial probabilities of ``Standard''. Let $\lambda_0>0$ be its low initial event rate and $g>0$ the growth per step:
