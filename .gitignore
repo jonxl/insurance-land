@@ -262,3 +262,6 @@ _minted*/
 # Compiled reports; PDF figures are inputs to LaTeX and remain trackable
 /plans/**/.build/
 !/plans/**/figures/*.pdf
+
+# Local saved experiments
+/studies/webui/runs/
