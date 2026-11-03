@@ -11,7 +11,7 @@ from experiments.worlds import WorldSpec
 
 
 def generate(
-    output: Path, *, seed: int = 42, periods: int = 120, rows: int = 16, columns: int = 16
+    output: Path, *, seed: int = 42, periods: int = 120, rows: int = 8, columns: int = 8
 ) -> None:
     output.mkdir(parents=True, exist_ok=True)
     worlds = {}

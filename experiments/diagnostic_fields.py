@@ -11,13 +11,7 @@ if TYPE_CHECKING:
 def diagnostic_fields(spec: WorldSpec) -> dict[str, Any]:
     config = spec.population()
     disaster = spec.disasters()
-    shape = (spec.rows, spec.columns)
-    anchors = disaster.risk_probabilities(shape, seed=spec.seed)
-    exposure = np.zeros(shape)
-    for (row, column), probability in np.ndenumerate(anchors):
-        exposure[
-            row : row + disaster.footprint_rows, column : column + disaster.footprint_columns
-        ] += probability
+    exposure = disaster.hit_probabilities((spec.rows, spec.columns), seed=spec.seed)
     percentiles = np.linspace(0, 1, 101)
     return {
         "hit_probability_per_event": exposure.tolist(),
@@ -27,10 +21,15 @@ def diagnostic_fields(spec: WorldSpec) -> dict[str, Any]:
             "reference_price": str(config.reference_price),
             "price_spread": config.price_spread,
             "price_length_scale": config.length_scale,
+            "home_price_spread": config.home_price_spread,
             "placement_noise": config.placement_noise,
             "risk_contrast": disaster.risk_contrast,
             "risk_length_scale": disaster.risk_length_scale,
-            "footprint": [disaster.footprint_rows, disaster.footprint_columns],
+            "homes_per_region": config.homes_per_region,
+            "region_size_contrast": config.region_size_contrast,
+            "region_size_length_scale": config.region_size_length_scale,
+            "radius_mean": disaster.radius.mean,
+            "radius_dispersion": disaster.radius.dispersion,
         },
         "policy": "Fixed baseline policies; no Q-learning training or rewards recorded.",
     }

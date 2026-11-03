@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import replace
 from decimal import Decimal
 
@@ -6,7 +7,7 @@ import pytest
 from domain.disasters import DisasterConfig
 from domain.housing import HousingMarket
 from factories import EnvironmentFactory, GridPopulationConfig, GridPopulationFactory
-from utils.distributions import PowerLorenz
+from utils.distributions import PowerLorenz, TweedieRadius, numpy_stream, price_field
 
 
 def test_grid_is_reproducible_and_has_consistent_relationships() -> None:
@@ -16,7 +17,9 @@ def test_grid_is_reproducible_and_has_consistent_relationships() -> None:
     environment = EnvironmentFactory.create(config)
     board = environment.grid_snapshot()
     assert len(board.prices) == 3 and len(board.prices[0]) == 4
-    assert {v for row in board.residents for v in row} == set(environment.people)
+    assert {v for row in board.residents for region in row for v in region} == set(
+        environment.people
+    )
     assert (
         sum(p.annual_income or Decimal(0) for p in scenario.people)
         == 12 * config.mean_annual_income
@@ -66,9 +69,9 @@ def test_disaster_displaces_once_preserves_title_and_snapshot() -> None:
     assert len({i for event in result.disasters for i in event.displaced_people}) == 4
     after = environment.grid_snapshot()
     assert after.owners == before.owners
-    assert all(v > 0 for row in before.prices for v in row)
-    assert all(v == 0 for row in after.prices for v in row)
-    assert all(v == 0 for row in after.residents for v in row)
+    assert all(v > 0 for row in before.prices for region in row for v in region)
+    assert all(v == 0 for row in after.prices for region in row for v in region)
+    assert all(v == 0 for row in after.residents for region in row for v in region)
     assert all(environment.observe(i).residence is None for i in environment.people)
     assert not any(e.losses for e in environment.step().disasters)
 
@@ -103,7 +106,7 @@ def test_invalid_grid_and_footprint() -> None:
             GridPopulationConfig(rows=1, columns=1), disasters=DisasterConfig(footprint_rows=2)
         )
     scenario = GridPopulationFactory.create(GridPopulationConfig(rows=1, columns=2))
-    with pytest.raises(ValueError, match="unique"):
+    with pytest.raises(ValueError, match="at least one home"):
         EnvironmentFactory.from_scenario(
             replace(
                 scenario, homes=(scenario.homes[0], replace(scenario.homes[1], position=(0, 0)))
@@ -129,6 +132,68 @@ def test_hidden_risk_is_fixed_private_and_counts_are_independent() -> None:
         assert len(first.step().disasters) == len(second.step().disasters)
     with pytest.raises(ValueError):
         probabilities[0, 0] = 1
+
+
+def test_larger_regions_hold_more_homes_and_people_still_match_homes() -> None:
+    config = GridPopulationConfig(rows=6, columns=6, seed=5, homes_per_region=4)
+    scenario = GridPopulationFactory.create(config)
+    sizes = Counter(h.position for h in scenario.homes)
+    assert len(sizes) == 36 and min(sizes.values()) >= 1 and max(sizes.values()) > 4
+    assert len(scenario.homes) == len(scenario.people) == 144
+    assert len(scenario.regions) == 36
+    environment = EnvironmentFactory.from_scenario(scenario)
+    regional = price_field(
+        (6, 6),
+        reference_price=float(config.reference_price),
+        spread=config.price_spread,
+        length_scale=config.length_scale,
+        rng=numpy_stream(5, "prices"),
+    )
+    assert len({h.market_value for h in scenario.homes}) > 36  # Homes in a region can differ.
+    for home in scenario.homes[:20]:
+        same_region = environment.homes_in_region(home.region_id)
+        assert {h.position for h in same_region} == {home.position}
+        mean = sum(h.market_value for h in same_region) / len(same_region)
+        assert float(mean) == pytest.approx(float(regional[home.position]), abs=0.01)
+    assert sorted(h.occupant_id for h in scenario.homes) == list(range(1, 145))
+    board = environment.grid_snapshot()
+    assert [len(region) for row in board.home_ids for region in row] == [
+        sizes[a, b] for a in range(6) for b in range(6)
+    ]
+
+
+def test_region_sizes_are_spatially_smooth_and_can_be_even() -> None:
+    def spread(contrast: float, length_scale: float, seed: int):
+        config = GridPopulationConfig(
+            rows=8,
+            columns=8,
+            seed=seed,
+            homes_per_region=4,
+            region_size_contrast=contrast,
+            region_size_length_scale=length_scale,
+        )
+        sizes = Counter(h.position for h in GridPopulationFactory.create(config).homes)
+        return [[sizes[a, b] for b in range(8)] for a in range(8)]
+
+    assert {v for row in spread(0, 2, 1) for v in row} == {4}  # No contrast: every region even.
+
+    def neighbor_gap(contrast: float, length_scale: float) -> float:
+        grids = [spread(contrast, length_scale, seed) for seed in range(30)]
+        gaps = [abs(g[a][b] - g[a][b + 1]) for g in grids for a in range(8) for b in range(7)]
+        return sum(gaps) / len(gaps)
+
+    assert neighbor_gap(1, 2) < neighbor_gap(1, 0)  # Smoothing keeps neighbors alike.
+
+
+def test_one_disaster_strikes_every_home_in_its_regions() -> None:
+    config = GridPopulationConfig(rows=5, columns=5, seed=2, homes_per_region=3)
+    environment = EnvironmentFactory.create(
+        config, disasters=DisasterConfig(rate=3, radius=TweedieRadius(), risk_contrast=1)
+    )
+    at_cell = Counter(h.position for h in environment.homes.values())
+    event = next(e for _ in range(20) for e in environment.step().disasters if e.losses)
+    assert {h.position for h in event.losses} <= set(event.cells)
+    assert len(event.losses) == sum(at_cell[c] for c in event.cells)
 
 
 def test_random_placement_preserves_resources_and_ownership_quotas() -> None:

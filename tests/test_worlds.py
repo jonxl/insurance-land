@@ -21,10 +21,13 @@ def test_matched_worlds_initial_conditions_and_rate_budgets() -> None:
     assert all(h.owner_id == h.occupant_id for h in peace.homes)
     assert {p.annual_income for p in peace.people} == {Decimal(50000)}
     assert scenarios[1] == scenarios[2]
+    # Every world shares one geography, so comparisons see the same homes in the same places.
+    assert [h.position for h in peace.homes] == [h.position for h in scenarios[1].homes]
     for spec, scenario in zip(specs, scenarios, strict=True):
-        assert sum(p.cash for p in scenario.people) == 16 * 10000
-        assert sum(p.annual_income or Decimal(0) for p in scenario.people) == 16 * 50000
-        assert sum(spec.rates()) == pytest.approx(5)
+        assert len(scenario.homes) == len(scenario.people) == 64
+        assert sum(p.cash for p in scenario.people) == 64 * 10000
+        assert sum(p.annual_income or Decimal(0) for p in scenario.people) == 64 * 50000
+        assert sum(spec.rates()) == pytest.approx(1 if spec.name == "Standard" else 5)
         np.testing.assert_array_equal(
             spec.disasters().risk_probabilities((4, 4), seed=42),
             specs[0].disasters().risk_probabilities((4, 4), seed=42),

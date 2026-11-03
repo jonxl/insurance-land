@@ -15,20 +15,33 @@ from experiments.worlds import WorldSpec
 
 
 def parse_spec(values: dict) -> WorldSpec:
-    limits = {"seed": (0, 2**32 - 1), "periods": (1, 500), "rows": (3, 32), "columns": (3, 32)}
-    if set(values) - {*limits, "name", "rate", "chaos_rate_ratio"}:
+    limits = {
+        "seed": (0, 2**32 - 1),
+        "periods": (1, 500),
+        "rows": (3, 32),
+        "columns": (3, 32),
+        "homes_per_region": (1, 16),
+    }
+    decimals = (
+        ("rate", 0, 10),
+        ("chaos_rate_ratio", 1.001, 100),
+        ("radius_mean", 0.01, 2),
+        ("radius_dispersion", 0.1, 5),
+    )
+    if set(values) - {*limits, "name", *(key for key, _, _ in decimals)}:
         raise ValueError("Unknown experiment setting")
     for key, (low, high) in limits.items():
         value = values.get(key, getattr(WorldSpec(), key))
         if type(value) is not int or not low <= value <= high:
             raise ValueError(f"{key} must be an integer from {low} to {high}")
-    for key, low, high in (("rate", 0, 10), ("chaos_rate_ratio", 1.001, 100)):
+    for key, low, high in decimals:
         value = values.get(key, getattr(WorldSpec(), key))
         if type(value) not in (int, float) or not low <= value <= high:
             raise ValueError(f"{key} must be between {low} and {high}")
-    if values.get("rows", 16) * values.get("columns", 16) * values.get("periods", 120) > 128000:
+    spec = WorldSpec(**values)
+    if spec.rows * spec.columns * spec.homes_per_region * spec.periods > 128000:
         raise ValueError("Use fewer homes or periods (maximum 128,000 home-periods)")
-    return WorldSpec(**values)
+    return spec
 
 
 def run_experiment(spec: WorldSpec, output: Path) -> None:

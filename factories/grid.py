@@ -1,4 +1,8 @@
-"""Seeded toy-model population with one initial resident per grid cell."""
+"""Seeded toy-model population: each grid cell is a region of one or more homes.
+
+Every home starts with one resident, so people and homes stay equal in number.
+Homes in a region share its location; their initial prices average the regional price.
+"""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -12,11 +16,13 @@ from utils.distributions import (
     PowerLorenz,
     allocate_counts,
     allocate_money,
+    home_price_factors,
     lorenz_shares,
     match_residences,
     monetary_array,
     numpy_stream,
     price_field,
+    region_home_counts,
     validate_shape,
 )
 from utils.validation.money import validate_money
@@ -34,15 +40,21 @@ class GridPopulationConfig:
     initial_cash: Decimal = Decimal("10000")
     reference_price: Decimal = Decimal("250000")
     price_spread: float = 0.4
+    home_price_spread: float = 0.2  # Log-price spread among homes within a region.
     length_scale: float = 2.0
     placement_noise: float = 0.1
     placement_mode: Literal["income", "random"] = "income"
     rent_per_period: Decimal = Decimal("1000")
+    homes_per_region: int = 1  # Mean; total homes = rows * columns * homes_per_region.
+    region_size_contrast: float = 1.0
+    region_size_length_scale: float = 2.0
 
     def __post_init__(self) -> None:
         validate_shape(self.rows, self.columns)
         if type(self.periods_per_year) is not int or self.periods_per_year <= 0:
             raise ValueError("periods_per_year must be a positive integer")
+        if type(self.homes_per_region) is not int or self.homes_per_region <= 0:
+            raise ValueError("homes_per_region must be a positive integer")
         for name in ("mean_annual_income", "initial_cash", "reference_price", "rent_per_period"):
             validate_money(getattr(self, name), field=name)
         if self.reference_price == 0:
@@ -51,8 +63,11 @@ class GridPopulationConfig:
             not isfinite(v) or v < 0
             for v in (
                 self.price_spread,
+                self.home_price_spread,
                 self.length_scale,
                 self.placement_noise,
+                self.region_size_contrast,
+                self.region_size_length_scale,
             )
         ):
             raise ValueError("noise parameters must be finite and nonnegative")
@@ -64,7 +79,14 @@ class GridPopulationConfig:
 class GridPopulationFactory:
     @staticmethod
     def create(config: GridPopulationConfig) -> Scenario:
-        count = config.rows * config.columns
+        count = config.rows * config.columns * config.homes_per_region
+        sizes = region_home_counts(
+            (config.rows, config.columns),
+            homes_per_region=config.homes_per_region,
+            contrast=config.region_size_contrast,
+            length_scale=config.region_size_length_scale,
+            rng=numpy_stream(config.seed, "region-sizes"),
+        )
         shares = lorenz_shares(config.income_curve, count)
         annual = allocate_money(
             config.mean_annual_income * count, shares, numpy_stream(config.seed, "income")
@@ -81,13 +103,25 @@ class GridPopulationFactory:
             length_scale=config.length_scale,
             rng=numpy_stream(config.seed, "prices"),
         )
-        cells = [(a, b) for a in range(config.rows) for b in range(config.columns)]
+        cells = [
+            (a, b)
+            for a in range(config.rows)
+            for b in range(config.columns)
+            for _ in range(int(sizes[a, b]))
+        ]
+        factors = home_price_factors(
+            [int(size) for size in sizes.ravel()],
+            spread=config.home_price_spread,
+            rng=numpy_stream(config.seed, "home-prices"),
+        )
         stored_prices = tuple(
             max(
                 Decimal("0.01"),
-                Decimal(str(float(prices[a, b]))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+                Decimal(str(float(prices[a, b] * factor))).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                ),
             )
-            for a, b in cells
+            for (a, b), factor in zip(cells, factors, strict=True)
         )
         placement_rng = numpy_stream(config.seed, "placement")
         placement = (
@@ -126,7 +160,7 @@ class GridPopulationFactory:
         homes = tuple(
             Home(
                 id=j + 1,
-                region_id=1,
+                region_id=a * config.columns + b + 1,
                 owner_id=owners[j] + 1,
                 market_value=stored_prices[j],
                 occupant_id=residents[j] + 1,
@@ -136,7 +170,11 @@ class GridPopulationFactory:
             for j, (a, b) in enumerate(cells)
         )
         return Scenario(
-            (Region(1, "Grid"),),
+            tuple(
+                Region(a * config.columns + b + 1, f"Row {a}, column {b}")
+                for a in range(config.rows)
+                for b in range(config.columns)
+            ),
             people,
             tuple(Household(p.id, p.id) for p in people),
             homes,

@@ -22,8 +22,7 @@ def save(fig, name):
 
 # Independent labeled risk stream under the same global seed.
 def plot_hidden_risk():
-    rows = columns = 16
-    footprint = 3
+    rows = columns = 8
     risk_length, contrast = 2.0, 1.0
     risk_rng = np.random.default_rng(np.random.SeedSequence([42, 1]))
     cells = np.indices((rows, columns)).reshape(2, -1).T
@@ -32,23 +31,92 @@ def plot_hidden_risk():
     risk_noise = risk_rng.normal(size=rows * columns)
     smooth = (kernel @ risk_noise) / np.sqrt((kernel**2).sum(axis=1))
     weights = np.exp(contrast * smooth.reshape(rows, columns))
-    eligible = weights[:rows-footprint+1, :columns-footprint+1]
-    probability = eligible / eligible.sum()
+    probability = weights / weights.sum()
     assert np.isclose(probability.sum(), 1) and np.all(probability > 0)
     height, width = probability.shape
     fig, ax = plt.subplots(figsize=(6, 4.8), layout='constrained')
     im = ax.imshow(100 * probability, cmap='Purples', interpolation='nearest',
                    origin='lower', extent=(.5, width+.5, .5, height+.5))
-    ax.set(title='Hidden disaster risk', xlabel='Anchor column b', ylabel='Anchor row a',
-           xticks=[1, 4, 8, 12, 14], yticks=[1, 4, 8, 12, 14])
+    ax.set(title='Hidden disaster risk', xlabel='Column b', ylabel='Row a',
+           xticks=range(1, width+1), yticks=range(1, height+1))
     ax.set_xticks(np.arange(.5, width+1), minor=True)
     ax.set_yticks(np.arange(.5, height+1), minor=True)
     ax.grid(which='minor', color='white', linewidth=.4)
     ax.tick_params(which='minor', bottom=False, left=False)
-    fig.colorbar(im, ax=ax, label='Event anchor probability (%)')
+    fig.colorbar(im, ax=ax, label='Probability of being the disaster center (%)')
     save(fig, 'hidden-spatial-risk')
 
 plot_hidden_risk()
+
+# Region sizes: one home per region, then the rest by a smoothed log-normal field.
+def plot_region_sizes():
+    rows = columns = 8
+    mean_homes, contrast, length = 4, 1.0, 2.0
+    rng = np.random.default_rng(np.random.SeedSequence([42, 2]))
+    cells = np.indices((rows, columns)).reshape(2, -1).T
+    distance = ((cells[:, None] - cells[None, :]) ** 2).sum(axis=2)
+    kernel = np.exp(-distance / (2 * length**2))
+    smooth = (kernel @ rng.normal(size=rows * columns)) / np.sqrt((kernel**2).sum(axis=1))
+    weights = np.exp(contrast * smooth)
+    spare = rows * columns * (mean_homes - 1)
+    target = spare * weights / weights.sum()
+    extra = np.floor(target + .5).astype(int)
+    while extra.sum() != spare:
+        step = 1 if extra.sum() < spare else -1
+        extra[np.argmax(step * (target - extra))] += step
+    sizes = (1 + extra).reshape(rows, columns)
+    assert sizes.sum() == rows * columns * mean_homes and sizes.min() >= 1
+    fig, ax = plt.subplots(figsize=(6, 4.8), layout='constrained')
+    im = ax.imshow(sizes, cmap='YlOrBr', interpolation='nearest', origin='lower',
+                   extent=(.5, columns+.5, .5, rows+.5))
+    for (a, b), size in np.ndenumerate(sizes):
+        ax.text(b + 1, a + 1, str(size), ha='center', va='center', fontsize=9,
+                color='white' if size > sizes.max() * .6 else '#2e1c12')
+    ax.set(title='Homes in each region', xlabel='Column b', ylabel='Row a',
+           xticks=range(1, columns+1), yticks=range(1, rows+1))
+    fig.colorbar(im, ax=ax, label='Homes')
+    save(fig, 'region-sizes')
+
+plot_region_sizes()
+
+# Disaster size: a Tweedie of power 3/2 floored to a whole radius, against the earlier normal.
+def tweedie_reach(d, mean=.3, dispersion=1.5):
+    if d == 0:
+        return 1.0
+    rate, jump = 2 * math.sqrt(mean) / dispersion, dispersion * math.sqrt(mean) / 2
+    x, jumps, term, erlang, total = d / jump, math.exp(-rate), math.exp(-d / jump), 0.0, 0.0
+    for n in range(1, 400):
+        jumps *= rate / n
+        erlang += term
+        term *= x / n
+        total += jumps * erlang
+    return total
+
+def plot_disaster_sizes():
+    PURPLE = '#4a2496'
+    GRAY = '#8a847c'
+    fig, axes = plt.subplots(1, 2, figsize=(10, 3.4), layout='constrained')
+    tail = [tweedie_reach(d) for d in range(8)]
+    normal = [math.erfc(d / math.sqrt(2)) for d in range(8)]
+    mass = [tail[0] - tail[1], tail[1] - tail[2], tail[2] - tail[3], tail[3]]
+    labels = ['1 × 1', '3 × 3', '5 × 5', '7 × 7 or larger']
+    shades = ['#d9d6d1', '#b9a6dc', '#7f5fc0', PURPLE]
+    bars = axes[0].bar(labels, mass, color=shades, width=.6)
+    for bar, value in zip(bars, mass):
+        axes[0].text(bar.get_x() + bar.get_width() / 2, value + .02, f'{100*value:.2f}%',
+                     ha='center', fontsize=9)
+    axes[0].set(title='Zone size in regions', xlabel=r'Side length $2r_e+1$',
+                ylabel='Probability', ylim=(0, 1.05))
+    radii = range(1, 8)
+    axes[1].semilogy(radii, normal[1:], color=GRAY, marker='o', ms=3.5, lw=1.2,
+                     label='Earlier standard normal')
+    axes[1].semilogy(radii, tail[1:], color=PURPLE, marker='o', ms=3.5, lw=1.4, label='Tweedie')
+    axes[1].set(title='Chance a zone reaches a given radius', xlabel='Radius d',
+                ylabel=r'$\Pr(r_e\geq d)$', xticks=list(radii), ylim=(1e-12, 1))
+    axes[1].legend(frameon=False)
+    save(fig, 'disaster-sizes')
+
+plot_disaster_sizes()
 
 # Regenerate the new figure alone without rewriting the existing illustrations.
 if __name__ == '__main__':
@@ -57,7 +125,7 @@ if __name__ == '__main__':
         raise SystemExit(0)
 
 # Price field: exactly the normalized finite-grid Gaussian construction in the text.
-m = n = 16
+m = n = 8
 seed, reference, spread, length = 42, 250000, .4, 2.0
 rng = np.random.default_rng(seed)
 positions = np.indices((m, n)).reshape(2, -1).T
@@ -68,7 +136,7 @@ field = (weights @ noise) / np.sqrt((weights**2).sum(axis=1))
 prices = reference * np.exp(spread * field.reshape(m, n))
 fig, ax = plt.subplots(figsize=(6, 4.8), layout='constrained')
 im = ax.imshow(prices / 1000, cmap='YlOrBr', interpolation='nearest', origin='lower', extent=(.5, n+.5, .5, m+.5))
-ax.set(title='Initial home prices', xlabel='Column b', ylabel='Row a', xticks=[1,4,8,12,16], yticks=[1,4,8,12,16])
+ax.set(title='Initial home prices by region', xlabel='Column b', ylabel='Row a', xticks=range(1,n+1), yticks=range(1,m+1))
 ax.set_xticks(np.arange(.5, n+1), minor=True)
 ax.set_yticks(np.arange(.5, m+1), minor=True)
 ax.grid(which='minor', color='white', linewidth=.4)

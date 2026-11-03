@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from hashlib import sha256
-from math import isfinite
+from math import exp, isfinite, sqrt
 from random import Random
 
 import numpy as np
@@ -198,6 +198,47 @@ def price_field(
     return prices
 
 
+def region_home_counts(
+    shape: tuple[int, int],
+    *,
+    homes_per_region: int,
+    contrast: float,
+    length_scale: float,
+    rng: np.random.Generator,
+) -> IntArray:
+    """Give every region one home, then share the rest by a smoothed log-normal field."""
+    validate_shape(*shape)
+    if type(homes_per_region) is not int or homes_per_region <= 0:
+        raise ValueError("homes_per_region must be a positive integer")
+    _nonnegative(contrast, "contrast")
+    _nonnegative(length_scale, "length_scale")
+    field = smooth_field(rng.normal(size=shape), length_scale)
+    with np.errstate(over="ignore", under="ignore", invalid="ignore"):
+        weights = np.exp(contrast * field)
+        shares = weights / weights.sum()
+    if not np.isfinite(shares).all():
+        raise ValueError("region size parameters produce nonfinite shares")
+    spare = shape[0] * shape[1] * (homes_per_region - 1)
+    extra = allocate_counts(shares.ravel(), spare, rng)
+    return (1 + extra).reshape(shape)
+
+
+def home_price_factors(
+    sizes: Sequence[int], *, spread: float, rng: np.random.Generator
+) -> FloatArray:
+    """Log-normal factors for homes listed region by region; each region's factors average 1."""
+    _nonnegative(spread, "spread")
+    with np.errstate(over="ignore", under="ignore", invalid="ignore"):
+        factors = np.exp(spread * rng.normal(size=sum(sizes)))
+        start = 0
+        for size in sizes:
+            factors[start : start + size] /= factors[start : start + size].mean()
+            start += size
+    if not np.isfinite(factors).all() or np.any(factors <= 0):
+        raise ValueError("home price spread produces nonfinite or zero prices")
+    return factors
+
+
 def anchor_probabilities(weights: ArrayLike, footprint: tuple[int, int]) -> FloatArray:
     field = _array(weights, 2)
     validate_shape(*footprint)
@@ -249,6 +290,59 @@ def match_residences(
     residents = np.empty(income.size, dtype=np.int64)
     residents[homes] = people
     return residents
+
+
+@dataclass(frozen=True, slots=True)
+class TweedieRadius:
+    """Whole-cell radii floor(Y) for Tweedie Y with power 3/2; a zone's side is 2r + 1 regions.
+
+    Y sums N ~ Poisson(jump_rate) exponential jumps of mean jump_mean, so E[Y] = mean and
+    Var[Y] = dispersion * mean ** 1.5. A smaller dispersion makes large radii rarer.
+    """
+
+    mean: float = 0.3
+    dispersion: float = 1.5
+
+    def __post_init__(self) -> None:
+        if any(not isfinite(v) or v <= 0 for v in (self.mean, self.dispersion)):
+            raise ValueError("Radius mean and dispersion must be finite and positive")
+        if self.jump_rate > 500:
+            raise ValueError("Radius dispersion is too small for this mean")
+
+    @property
+    def jump_rate(self) -> float:
+        return 2 * sqrt(self.mean) / self.dispersion
+
+    @property
+    def jump_mean(self) -> float:
+        return self.dispersion * sqrt(self.mean) / 2
+
+    def sample(self, count: int, rng: np.random.Generator) -> IntArray:
+        if type(count) is not int or count < 0:
+            raise ValueError("count must be a nonnegative integer")
+        # A gamma with whole shape n sums n exponentials; shape zero gives exactly zero.
+        jumps = rng.poisson(self.jump_rate, count)
+        return np.floor(rng.gamma(jumps, self.jump_mean)).astype(np.int64)
+
+    def reach(self, size: int) -> FloatArray:
+        """Pr(r >= d) for d = 0, ..., size - 1, the chance a zone extends d cells from center."""
+        if type(size) is not int or size <= 0:
+            raise ValueError("size must be a positive integer")
+        return np.array([1.0, *(self._tail(d / self.jump_mean) for d in range(1, size))])
+
+    def _tail(self, x: float) -> float:
+        # Pr(Y >= d) = sum_n Pr(N = n) Pr(Erlang(n) >= d), with the Erlang tail a Poisson sum.
+        jumps = exp(-self.jump_rate)
+        term = exp(-x)
+        erlang = total = 0.0
+        for n in range(1, 2000):
+            jumps *= self.jump_rate / n
+            erlang += term
+            term *= x / n
+            total += jumps * erlang
+            if n > self.jump_rate and jumps < 1e-18:
+                break
+        return total
 
 
 def sample_disasters(

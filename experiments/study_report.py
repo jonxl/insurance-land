@@ -12,7 +12,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from experiments.worlds import WorldSpec
-from utils.distributions import numpy_stream, price_field, sample_disasters, smooth_field
+from utils.distributions import (
+    numpy_stream,
+    price_field,
+    sample_disasters,
+    smooth_field,
+)
 
 BLUE, ORANGE, PURPLE = "#245b91", "#ba5a22", "#6a51a3"
 
@@ -31,10 +36,11 @@ def generate(output: Path, *, draws: int = 20000, field_samples: int = 500) -> N
         "and identical initial home prices. Disaster risk is still spatially unequal. "
         "There is no redistribution after initialization.",
         "Standard": "Unequal income and ownership allocations, spatially varying prices, and "
-        "income-based residence placement with noise. The disaster rate is constant.",
+        "income-based residence placement with noise. The default disaster rate is a low, "
+        "constant 0.1 events per period.",
         "Chaos": "The same initial population, ownership, prices and hidden risk as “Standard”. "
-        "Only the disaster-rate schedule changes: it grows exponentially. The schedule "
-        "is normalized to match “Standard”’s expected total number of events.",
+        "Only the disaster-rate schedule changes: it grows exponentially. The default "
+        "mean rate is 0.5 events per period.",
     }
     for name, data in bundle["worlds"].items():
         spec = WorldSpec(**data["configuration"])
@@ -70,24 +76,35 @@ def generate(output: Path, *, draws: int = 20000, field_samples: int = 500) -> N
 
         homes = first["homes"]
         people = first["people"]
-        prices = np.array([float(h["value"]) for h in homes]).reshape(shape)
         incomes = np.array([float(p["annual_income"]) for p in people])
         counts = np.bincount([h["owner"] - 1 for h in homes], minlength=len(people))
-        residents = np.array([h["resident"] - 1 for h in homes]).reshape(shape)
+        # Homes in a region share its price, so one value describes the region.
+        prices = np.zeros(shape)
+        region_homes = np.zeros(shape, dtype=int)
+        region_income = np.zeros(shape)
+        for home in homes:
+            cell = tuple(home["position"])
+            prices[cell] = float(home["value"])
+            region_homes[cell] += 1
+            region_income[cell] += incomes[home["resident"] - 1]
         probabilities = spec.disasters().risk_probabilities(shape, seed=spec.seed)
-        exposure = np.zeros(shape)
-        for (a, b), probability in np.ndenumerate(probabilities):
-            exposure[a : a + 3, b : b + 3] += probability
-        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+        exposure = spec.disasters().hit_probabilities(shape, seed=spec.seed)
+        fig, axes = plt.subplots(1, 4, figsize=(16, 4))
         for ax, values, title, cmap in zip(
             axes,
-            [prices / 1000, incomes[residents] / 1000, 100 * (1 - np.exp(-rates[0] * exposure))],
             [
+                region_homes,
+                prices / 1000,
+                region_income / region_homes / 1000,
+                100 * (1 - np.exp(-rates[0] * exposure)),
+            ],
+            [
+                "Homes in each region",
                 "Initial home prices ($ thousands)",
-                "Resident income ($ thousands / year)",
+                "Mean resident income ($ thousands / year)",
                 "First-period exposure (%)",
             ],
-            ["YlOrBr", "YlOrBr", "Purples"],
+            ["YlOrBr", "YlOrBr", "YlOrBr", "Purples"],
             strict=True,
         ):
             im = ax.imshow(values, cmap=cmap, interpolation="nearest")
@@ -96,10 +113,11 @@ def generate(output: Path, *, draws: int = 20000, field_samples: int = 500) -> N
         save(
             "world",
             "Initial world",
-            "Each square is a home. Orange maps show initial prices "
-            "and the annual income of its resident. Purple shows the probability of at least one "
-            "hit in the first period, including all overlapping 3 × 3 footprints. "
-            "In “Chaos”, this probability increases over time. Color scales are labeled per panel; "
+            "Each square is a region, and larger regions hold more homes. Orange maps show "
+            "homes per region, initial prices, and the mean annual income of residents. Purple "
+            "shows the probability of at least one hit in the first period, across every "
+            "disaster zone that could reach the region. In “Chaos”, this probability increases "
+            "over time. Color scales are labeled per panel; "
             "a uniform map means identical values, not missing data.",
         )
 
@@ -201,6 +219,8 @@ def generate(output: Path, *, draws: int = 20000, field_samples: int = 500) -> N
         diagnostic_rates = np.resize(rates, draws)
         count_rng = numpy_stream(spec.seed, "diagnostic-counts")
         location_rng = numpy_stream(spec.seed, "diagnostic-locations")
+        size_rng = numpy_stream(spec.seed, "diagnostic-sizes")
+        radius = spec.disasters().radius
         events = np.zeros(draws, dtype=int)
         hits = np.zeros(shape, dtype=int)
         anchors_count = np.zeros(probabilities.shape, dtype=int)
@@ -210,9 +230,9 @@ def generate(output: Path, *, draws: int = 20000, field_samples: int = 500) -> N
             )
             events[i] = len(anchors)
             hit = np.zeros(shape, dtype=bool)
-            for a, b in anchors:
+            for (a, b), r in zip(anchors, radius.sample(len(anchors), size_rng), strict=True):
                 anchors_count[a, b] += 1
-                hit[a : a + 3, b : b + 3] = True
+                hit[max(0, a - r) : a + r + 1, max(0, b - r) : b + r + 1] = True
             hits += hit
         k = np.arange(max(int(events.max()), 5) + 1)
         # A mixture of period-specific Poisson distributions, not Poisson(mean rate).
@@ -335,7 +355,8 @@ def generate(output: Path, *, draws: int = 20000, field_samples: int = 500) -> N
             f'<section id="{name.lower()}" class="world-section" '
             f'aria-labelledby="heading-{name.lower()}"><h2 id="heading-{name.lower()}">'
             f"“{name}”</h2><p>{descriptions[name]}</p>"
-            f'<p class="facts">{spec.rows} × {spec.columns} homes · Seed {spec.seed} · '
+            f'<p class="facts">{spec.rows} × {spec.columns} regions · {len(homes)} homes · '
+            f"Seed {spec.seed} · "
             f"{spec.periods} periods · Expected events {rates.sum():.1f} · "
             f"Rate {rates[0]:.3f} → {rates[-1]:.3f}</p>"
             f'<p><a href="assets/{name.lower()}/summary.json">Summary</a> · '
@@ -388,10 +409,11 @@ noise and prices, disaster sampling, and recorded outcomes. Switch worlds to com
 explanations and figures.</p>
 <p>All worlds share the seed, population, initial cash budget, annual income budget,
 insurer capital,
-3 × 3 footprint, hidden risk field, insurance terms, and baseline policies. “Chaos” grows
+region sizes, disaster size rule, hidden risk field, insurance terms, and baseline policies.
+“Chaos” grows
 tenfold from
-its first-period rate to its last-period rate;
- its expected event total matches the other worlds.</p>
+its first-period rate to its last-period rate.
+“Standard” defaults to 0.1 events per period; the other worlds average 0.5.</p>
 <details><summary>Scope of this study</summary><p>Parameters are illustrative, not calibrated.
 Income and rent currently settle each period;
  the proposed 10/20-run payment clock is unfinished.

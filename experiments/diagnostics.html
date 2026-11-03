@@ -84,8 +84,14 @@ h1{font-size:40px;line-height:1.1;font-weight:600}
 .map-head .when{color:var(--muted);font-variant-numeric:tabular-nums}
 #lensNote{margin:2px 0 8px;color:var(--muted);font-size:14px;line-height:1.35}
 #insurerFocus{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px;font-size:14px}
-.grid{display:grid;gap:2px;width:100%;max-width:640px}
-.tick{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:center;align-self:center;line-height:1.3}
+.grid{position:relative;width:100%;max-width:640px}
+.region{position:absolute;box-sizing:border-box;display:flex;flex-direction:column;min-width:0;min-height:0;border:3px solid var(--page);background:var(--page)}
+.region-head{flex:none;height:15px;padding:0 3px;font-size:10px;font-weight:600;line-height:15px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
+.grid.dense .region-head{display:none}
+.region-homes{position:relative;flex:1;min-height:0}
+.region .cell{position:absolute;aspect-ratio:auto;font-size:clamp(7px,calc(var(--home-side) / 3.2),12px)}
+.region .cell.long-label{font-size:clamp(6px,calc(var(--home-side) / 3.8),11px);letter-spacing:-.03em}
+.region .cell.scarred::after{border-width:0 6px 6px 0}
 .cell{position:relative;aspect-ratio:1;padding:0;min-width:0;border:0;border-radius:2px;font-size:clamp(9px,1.95cqw,14px);font-weight:500;font-variant-numeric:tabular-nums;line-height:1;overflow:hidden}
 .grid{container-type:inline-size}
 .cell.selected{outline:2px solid var(--ink);outline-offset:0;box-shadow:inset 0 0 0 1px #fff;z-index:1}
@@ -278,11 +284,14 @@ h1{font-size:28px}
 <label>World<select name="name"><option>Peace</option><option selected>Standard</option><option>Chaos</option></select></label>
 <label>Seed<input name="seed" type="number" min="0" max="4294967295" value="42" required></label>
 <label>Periods<input name="periods" type="number" min="1" max="500" value="120" required></label>
-<label>Rows<input name="rows" type="number" min="3" max="32" value="16" required></label>
-<label>Columns<input name="columns" type="number" min="3" max="32" value="16" required></label>
-<label>Mean events per period<input name="rate" type="number" min="0" max="10" step="any" value="0.5" required></label>
+<label>Rows of neighborhoods<input name="rows" type="number" min="3" max="32" value="8" required></label>
+<label>Columns of neighborhoods<input name="columns" type="number" min="3" max="32" value="8" required></label>
+<label>Mean homes per neighborhood<input name="homes_per_region" type="number" min="1" max="16" value="4" required></label>
+<label>Mean events per period<input name="rate" type="number" min="0" max="10" step="any" value="0.1" required></label>
 <label>Chaos final / initial rate<input name="chaos_rate_ratio" type="number" min="1.001" max="100" step="any" value="10" required></label>
-</div><p class="muted small">Peace starts with equal allocations. Standard uses unequal allocations. Chaos uses Standard’s allocations with a rising disaster rate and the same expected event total. Runs use fixed baseline policies.</p><button id="launch" type="submit" disabled>Start experiment</button>
+<label>Mean disaster radius<input name="radius_mean" type="number" min="0.01" max="2" step="any" value="0.3" required></label>
+<label>Disaster size dispersion<input name="radius_dispersion" type="number" min="0.1" max="5" step="any" value="1.5" required></label>
+</div><p class="muted small">Peace starts with equal allocations. Standard uses unequal allocations. Chaos uses Standard’s allocations with a rising disaster rate. A lower dispersion makes large disasters rarer. Runs use fixed baseline policies.</p><button id="launch" type="submit" disabled>Start experiment</button>
 <p id="runnerHelp" class="small">To enable experiments, run <code>uv run python -m experiments.command_center</code> and open <a href="http://127.0.0.1:8000">the local command center</a>.</p>
 <p id="runStatus" role="status" aria-live="polite"></p><a id="runResult" hidden>Read experiment snapshots</a></form></section>
 <div id="snapshotView">
@@ -304,12 +313,12 @@ h1{font-size:28px}
 <label class="lens"><input type="radio" name="layer" value="coverage">Coverage<span class="chips" aria-hidden="true"><i style="background:#d9d6d1"></i><i style="background:#f5b7b5"></i><i style="background:#b3cde3"></i></span></label>
 <label class="lens"><input type="radio" name="layer" value="insurers">Insurer portfolios<span class="chips" aria-hidden="true"><i style="background:#f5b7b5"></i><i style="background:#ccebc5"></i><i style="background:#b3cde3"></i></span></label></fieldset>
 <fieldset class="lens-group"><legend>Follow an insurer</legend><div id="firms"></div></fieldset>
-<label class="toggle" id="valuesToggle"><input type="checkbox" id="showValues">Print values on cells</label>
+<label class="toggle" id="valuesToggle"><input type="checkbox" id="showValues" checked>Print values on homes</label>
 </aside>
 <section class="map-panel" aria-label="World map"><div class="map-head"><h2 id="lensTitle"></h2><span class="when" id="lensWhen"></span></div><p id="lensNote"></p><div id="insurerFocus" hidden><span id="insurerFocusLabel" role="status"></span><button id="clearInsurer" type="button">Show all insurers</button></div><div class="map-stage"><div id="grid" class="grid" aria-label="Homes"></div></div><div id="legend" class="legend"></div></section>
 <section class="agent-panel" aria-label="Details"><div class="panel-tabs" role="group" aria-label="Admin console"><button data-tab="overview" aria-pressed="true">Overview</button><button data-tab="disasters" aria-pressed="false">Disasters <span class="count"></span></button><button data-tab="insurance" aria-pressed="false">Insurance <span class="count"></span></button><button data-tab="ledger" aria-pressed="false">Ledger <span class="count"></span></button><button data-tab="trades" aria-pressed="false">Trades <span class="count"></span></button><button data-tab="people" aria-pressed="false">People</button></div><div id="panelBody"><div id="globalPanel"></div><div id="feedPanel" hidden><div class="feed-head"><p id="feedHead"></p><div id="ledgerFilter" class="segmented" role="group" aria-label="Transaction type" hidden><button data-kind="all" aria-pressed="true">All</button><button data-kind="income" aria-pressed="false">Income</button><button data-kind="rent" aria-pressed="false">Rent</button><button data-kind="unpaid" aria-pressed="false">Unpaid</button><button data-kind="premium" aria-pressed="false">Premiums</button><button data-kind="claim" aria-pressed="false">Claims</button></div></div><div id="feed"></div></div><p id="pickPrompt" class="muted" hidden>Click a home on the map to see that person’s stats, or choose an insurer. Press Esc to return to the overview.</p><div id="agentBody" hidden><section id="home" aria-live="polite" aria-label="Selected home"></section><h2 id="agentTitle"></h2><p id="roles"></p><details id="portfolioHelp"><summary>How are insurer portfolios assigned?</summary><p>Each owner's homes stay together. Existing ownership portfolios are ranked by their total initial property value and allocated to Red, Green, and Blue using the ownership distribution. Coverage is purchased from the assigned firm when eligible and affordable. The seed fixes the assignment; insurer colors do not imply rank.</p></details><dl id="stats" class="stats"></dl><div class="chart-controls segmented" role="group" aria-label="Chart view"><button data-chart="balance" aria-pressed="true">Balance</button><button data-chart="flows" aria-pressed="false">Cash flow</button><button data-chart="claims" aria-pressed="false">Claims</button><button data-chart="disasters" aria-pressed="false">Disasters</button></div><h3 id="chartTitle"></h3><div id="history"></div><div class="key-row" id="chartKey" aria-live="polite"></div><p id="chartNote"></p><h3 class="flow-heading">This period’s payments</h3><div id="flows" class="scroll"></div></div></div></section></main><section id="researchView" hidden aria-labelledby="researchTitle">
 <h2 id="researchTitle">Research</h2><p class="lead">Press play or drag the timeline and everything below moves with it. Period zero is after opening insurance premiums.</p>
-<section class="research-section" id="worldCompare"><h3>Damage in each world</h3><p class="muted">Same period, same grid. Select a world to switch to it.</p><div id="worldPlates" class="atlas worlds"></div></section>
+<section class="research-section" id="worldCompare"><h3>Damage in each world</h3><p class="muted">Same period, same map. Select a world to switch to it.</p><div id="worldPlates" class="atlas worlds"></div></section>
 <section class="research-section"><h3>Field atlas</h3><p class="muted">Each map reads one field at the selected period. Gray means unaffected for that field and purple always means disaster. Select a map to open it full size. Hit probability is research-only, hidden from agents.</p><div id="atlas" class="atlas"></div><details><summary>Initialization settings</summary><p id="setupFacts" class="muted small"></p></details></section>
 <section class="research-section"><div class="research-controls"><h3>Outcomes over time</h3><label>Measure <select id="outcomeMetric"><option value="housing">Displacement</option><option value="coverage">Coverage</option><option value="claims">Claims due and paid</option><option value="capital">Insurer capital</option><option value="disasters">Disaster counts</option></select></label></div><div id="outcomePlot"></div><p id="outcomeNote" class="muted research-note"></p></section>
 <section class="research-section"><div class="research-controls"><h3>People and distributions</h3><label>Measure <select id="researchMetric"><option value="annual_income">Annual external income</option><option value="cash">Cash</option><option value="property">Property value</option><option value="net" selected>Cash + property</option><option value="homes">Owned home titles</option></select></label></div>
@@ -347,6 +356,9 @@ $('readView').onclick=()=>showView('map');$('startView').onclick=()=>showView('s
 if(location.protocol==='http:')fetch('/api/health').then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(d.ready){$('launch').disabled=false;$('runnerHelp').textContent='Local runner connected. Keep this page open to follow the run.';}}).catch(()=>{});
 const config=worlds[worldName].configuration;
 if(config)for(const [key,value] of Object.entries(config)){const input=$('experimentForm').elements.namedItem(key);if(input)input.value=value;}
+$('experimentForm').elements.namedItem('name').onchange=event=>{
+ $('experimentForm').elements.namedItem('rate').value=worlds[event.target.value]?.configuration?.rate??(event.target.value==='Standard'?0.1:0.5);
+};
 $('experimentForm').onsubmit=async event=>{
  event.preventDefault();$('launch').disabled=true;$('runResult').hidden=true;$('runStatus').textContent='Starting experiment…';
  try{
@@ -371,7 +383,7 @@ let panelTab='overview',focusEvent=null,ledgerKind='all',feedLimit=25,feedHead=0
 const openThreads=new Set();
 function setTab(tab){panelTab=tab;if(tab!=='people'){homeId=null;selectedKind='person';selectedId=null;}feedLimit=25;hideTip();render();$('panelBody').scrollTop=0;}
 
-const worldBlurbs={Peace:'Equal income, one owner-occupied home per person, identical prices. Disaster risk is still spatially unequal.',Standard:'Unequal income and ownership, spatially varying prices, and a constant disaster rate.',Chaos:'Standard’s people and prices, with a disaster rate that grows over time and the same expected event total.'};
+const worldBlurbs={Peace:'Equal income, one owner-occupied home per person, identical prices. Disaster risk is still spatially unequal.',Standard:'Unequal income and ownership, spatially varying prices, and a constant disaster rate.',Chaos:'Standard’s people and prices, with a disaster rate that grows over time.'};
 function setWorld(name){worldName=name;data=worlds[name];frames=data.frames;period=Math.min(period,frames.length-1);$('period').max=frames.length-1;focusEvent=null;feedLimit=25;feedHead=period;openThreads.clear();renderRibbon();render();}
 Object.keys(worlds).forEach(name=>{const b=document.createElement('button');b.textContent=`“${name}”`;b.dataset.world=name;b.onclick=()=>setWorld(name);$('worlds').append(b);});
 $('period').max=frames.length-1;
@@ -399,12 +411,44 @@ function ownerColor(id){
 }
 const shape=[Math.max(...frames[0].homes.map(h=>h.position[0]))+1,Math.max(...frames[0].homes.map(h=>h.position[1]))+1];
 $('grid').style.gridTemplateColumns=`1.4em repeat(${shape[1]},minmax(0,1fr))`;
-// Survey ticks along the top and left use the same zero-based rows and columns as home details.
-const tickStep=shape[0]>20?10:5;
-for(let c=0;c<shape[1];c+=tickStep){const t=document.createElement('span');t.className='tick';t.textContent=c;t.setAttribute('aria-hidden','true');t.style.gridRow=1;t.style.gridColumn=c+2;$('grid').append(t);}
-for(let r=0;r<shape[0];r+=tickStep){const t=document.createElement('span');t.className='tick';t.textContent=r;t.setAttribute('aria-hidden','true');t.style.gridRow=r+2;t.style.gridColumn=1;$('grid').append(t);}
+// A treemap that keeps geography: split by grid position, giving each side area by home count.
+function treemap(items,x,y,w,h){
+ if(items.length===1)return [{...items[0],x,y,w,h}];
+ const wide=w>=h,sorted=[...items].sort((p,q)=>wide?p.col-q.col||p.row-q.row:p.row-q.row||p.col-q.col);
+ const total=sorted.reduce((n,item)=>n+item.count,0);
+ let left=sorted[0].count,cut=1;
+ while(cut<sorted.length-1&&Math.abs(total-2*(left+sorted[cut].count))<Math.abs(total-2*left)){left+=sorted[cut].count;cut++;}
+ const share=left/total,first=sorted.slice(0,cut),second=sorted.slice(cut);
+ return wide?[...treemap(first,x,y,w*share,h),...treemap(second,x+w*share,y,w*(1-share),h)]:[...treemap(first,x,y,w,h*share),...treemap(second,x,y+h*share,w,h*(1-share))];
+}
+const regionMembers=new Map();
+frames[0].homes.forEach(h=>{const key=h.position.join(',');if(!regionMembers.has(key))regionMembers.set(key,[]);regionMembers.get(key).push(h.id);});
+const regionSize=h=>regionMembers.get(h.position.join(',')).length;
+const blocks=treemap([...regionMembers].map(([key,ids])=>{const [row,col]=key.split(',').map(Number);return {key,row,col,count:ids.length,ids};}),0,0,shape[1],shape[0]);
+const tiles=new Map(),heads=new Map(),spots=new Map(),homeBoxes=new Map();
+$('grid').style.aspectRatio=`${shape[1]}/${shape[0]}`;
+$('grid').classList.toggle('dense',blocks.length>256);
+blocks.forEach(block=>{
+ const tile=document.createElement('div'),head=document.createElement('div'),inner=document.createElement('div');
+ tile.className='region';tile.style.cssText=`left:${100*block.x/shape[1]}%;top:${100*block.y/shape[0]}%;width:${100*block.w/shape[1]}%;height:${100*block.h/shape[0]}%`;
+ head.className='region-head';inner.className='region-homes';tile.append(head,inner);$('grid').append(tile);tiles.set(block.key,inner);heads.set(block.key,head);
+ // Homes sit in even rows matched to the block's shape; the last row stretches to fill it.
+ const count=block.ids.length,across=Math.max(1,Math.min(count,Math.round(Math.sqrt(count*block.w/block.h)))),lines=Math.ceil(count/across),extra=lines*across-count;
+ block.ids.forEach((id,i)=>{
+  const line=Math.floor(i/across),inLine=line===lines-1?across-extra:across,place=i-line*across;
+  homeBoxes.set(id,{left:100*place/inLine,top:100*line/lines,width:100/inLine,height:100/lines});
+  spots.set(id,{x:block.x+block.w*place/inLine+.015,y:block.y+block.h*line/lines+.015,w:block.w/inLine-.03,h:block.h/lines-.03});
+ });
+});
+// Size labels to the drawn map, and drop the strip where it would crowd a thin block's homes.
+function fitBlocks(){
+ const unit=$('grid').clientWidth/shape[1];if(!unit)return;
+ $('grid').style.setProperty('--home-side',`${unit*Math.sqrt(shape[0]*shape[1]/frames[0].homes.length)}px`);
+ for(const block of blocks)heads.get(block.key).hidden=block.h*unit<44||block.w*unit<48;
+}
+fitBlocks();new ResizeObserver(fitBlocks).observe($('grid'));
 const buttons=new Map();
-frames[0].homes.forEach(h=>{let b=document.createElement('button');b.className='cell';b.style.gridRow=h.position[0]+2;b.style.gridColumn=h.position[1]+2;b.onclick=()=>{if(panelTab!=='people')return;homeId=h.id;const now=frames[period].homes.find(x=>x.id===h.id);selectPerson(currentLayer()==="residence"?(now.resident??displacedResident(now)??now.owner):now.owner);};b.dataset.home=h.id;$('grid').append(b);buttons.set(h.id,b);});
+frames[0].homes.forEach(h=>{let b=document.createElement('button');b.className='cell';b.onclick=()=>{if(panelTab!=='people')return;homeId=h.id;const now=frames[period].homes.find(x=>x.id===h.id);selectPerson(currentLayer()==="residence"?(now.resident??displacedResident(now)??now.owner):now.owner);};b.dataset.home=h.id;tiles.get(h.position.join(',')).append(b);const box=homeBoxes.get(h.id);b.style.left=`${box.left}%`;b.style.top=`${box.top}%`;b.style.width=`calc(${box.width}% - 1px)`;b.style.height=`calc(${box.height}% - 1px)`;buttons.set(h.id,b);});
 const initialMax=Math.max(...Object.values(worlds).flatMap(w=>w.frames[0].homes.map(h=>Number(h.value))));
 const currentLayer=()=>document.querySelector('input[name=layer]:checked').value;
 function setLayer(value){document.querySelector(`input[name=layer][value=${value}]`).checked=true;}
@@ -479,7 +523,7 @@ function renderHome(){
  const displaced=displacedResident(h);
  const policies=covered(frames[period]).filter(c=>c.home===h.id);
  const wasOpen=$('home').querySelector('details')?.open;
- $('home').innerHTML=`<div class="home-heading"><strong>Home ${h.id}</strong>${h.destroyed?'<span class="home-destroyed">Destroyed, uninhabitable</span>':`<span>${money(h.value)}</span>`}${displaced!==null?`<span class="displaced-note">† Resident ${displaced} displaced</span>`:''}</div><div class="person-buttons"><button id="inspectOwner" aria-label="Follow owner ${h.owner}" aria-pressed="${selectedKind==='person'&&selectedId===h.owner}">${personIcon} Owner ${h.owner}</button>${resident&&resident!==h.owner?`<button id="inspectResident" aria-label="Follow ${former?'former ':''}resident ${resident}" aria-pressed="${selectedKind==='person'&&selectedId===resident}">${personIcon} ${former?'Former resident':'Resident'} ${resident}</button>`:''}</div><details${wasOpen?' open':''}><summary>Home details</summary><p>Row ${h.position[0]}, column ${h.position[1]}. ${h.destroyed?'Destroyed; owner retains title.':'Intact.'} ${h.resident?'Resident '+h.resident:'No current resident.'}</p><p>${policies.length?policies.map(c=>`${c.product}: ${firmName(c.firm)} insurance, person ${c.person}`).join('<br>'):'No current coverage on an intact home.'}</p></details>`;
+ $('home').innerHTML=`<div class="home-heading"><strong>Home ${h.id}</strong>${h.destroyed?'<span class="home-destroyed">Destroyed, uninhabitable</span>':`<span>${money(h.value)}</span>`}${displaced!==null?`<span class="displaced-note">† Resident ${displaced} displaced</span>`:''}</div><div class="person-buttons"><button id="inspectOwner" aria-label="Follow owner ${h.owner}" aria-pressed="${selectedKind==='person'&&selectedId===h.owner}">${personIcon} Owner ${h.owner}</button>${resident&&resident!==h.owner?`<button id="inspectResident" aria-label="Follow ${former?'former ':''}resident ${resident}" aria-pressed="${selectedKind==='person'&&selectedId===resident}">${personIcon} ${former?'Former resident':'Resident'} ${resident}</button>`:''}</div><details${wasOpen?' open':''}><summary>Home details</summary><p>Neighborhood at row ${h.position[0]}, column ${h.position[1]}, with ${regionSize(h)===1?'1 home':`${regionSize(h)} homes`}. ${h.destroyed?'Destroyed; owner retains title.':'Intact.'} ${h.resident?'Resident '+h.resident:'No current resident.'}</p><p>${policies.length?policies.map(c=>`${c.product}: ${firmName(c.firm)} insurance, person ${c.person}`).join('<br>'):'No current coverage on an intact home.'}</p></details>`;
  $('inspectOwner').style.background=ownerColor(h.owner);$('inspectOwner').title=`Owner ${h.owner}, ${ownerColor(h.owner)}`;
  $('inspectOwner').onclick=()=>selectPerson(h.owner);
  if($('inspectResident')){$('inspectResident').style.background=ownerColor(resident);$('inspectResident').onclick=()=>selectPerson(resident);}
@@ -491,7 +535,7 @@ document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>setTab(b.datase
 
 /* The rule for every lens lives here: what a home looks like under that field. */
 const lensNames={damage:'Damage',observed_hits:'Observed hits',exposure:'Hit probability',residence:'Residents',ownership:'Owners',value:'Home values',income_field:'Initial resident income',coverage:'Coverage',insurers:'Insurer portfolios'};
-const lensNotes={damage:'Purple homes were struck and are uninhabitable; their owners keep title. Gray homes have not been struck.',ownership:'Numbers identify owners. Each owner has a unique color, shared by every home they own, including rented homes. Destroyed homes turn purple and keep the owner ID. † marks a displaced resident, who may differ from the owner; select the home to see their ID.',residence:'Numbers and colors identify residents. On destroyed homes, purple and † preserve the displaced resident’s ID; they no longer live there. Gray means no resident is recorded.',value:'Darker caramel means higher value, on a fixed scale across periods and worlds. Purple homes were destroyed and have zero modeled value.',insurers:'Initial assignments follow whole ownership portfolios ranked by initial property value. R = Red, G = Green, B = Blue. Assignments persist after damage and do not guarantee active coverage.',coverage:'B = building policy; R = renters contents policy. Both can cover one home. Only intact, in-term interests count. Gray homes have no active policy.'};
+const lensNotes={damage:'Each block is a neighborhood, sized by how many homes it holds. Its strip counts destroyed homes, and each square inside is one home with its own agent. A disaster strikes every home in the neighborhoods it reaches. Purple homes were struck and are uninhabitable; their owners keep title. Gray homes have not been struck.',ownership:'Numbers identify owners. Each owner has a unique color, shared by every home they own, including rented homes. Destroyed homes turn purple and keep the owner ID. † marks a displaced resident, who may differ from the owner; select the home to see their ID.',residence:'Numbers and colors identify residents. On destroyed homes, purple and † preserve the displaced resident’s ID; they no longer live there. Gray means no resident is recorded.',value:'Each block is a neighborhood, sized by how many homes it holds. Its strip shows the mean value of its homes, and each square inside shows that home’s value. Darker caramel means higher value, on a fixed scale across periods and worlds. Purple homes were destroyed and have zero modeled value.',insurers:'Initial assignments follow whole ownership portfolios ranked by initial property value. R = Red, G = Green, B = Blue. Assignments persist after damage and do not guarantee active coverage.',coverage:'B = building policy; R = renters contents policy. Both can cover one home. Only intact, in-term interests count. Gray homes have no active policy.'};
 const printsValues=layer=>['value','income_field','exposure','observed_hits'].includes(layer);
 function bin(fraction){return Math.min(4,Math.max(0,Math.floor(fraction*5)));}
 function cellLook(layer,h,at,field,withValues=false){
@@ -519,6 +563,19 @@ function cellLook(layer,h,at,field,withValues=false){
  if(layer==='coverage'){if(!at.length)return look(CALM,'');const label=at.map(c=>c.product==='renters'?'R':'B').join('/');return new Set(at.map(c=>c.firm)).size===1?look(firmColor(at[0].firm),label):look('#fffbf5',label);}
  return look(CALM);
 }
+// The strip on each block summarizes its homes for the current lens.
+function regionSummary(layer,homes,field){
+ const count=homes.length,lost=homes.filter(h=>h.destroyed).length,average=values=>values.reduce((a,b)=>a+b,0)/values.length,thousands=v=>`$${Math.round(v/1000)}k`;
+ const neutral={bg:'#e9dfcf',label:count===1?'1 home':`${count} homes`};
+ if(layer==='damage')return {bg:lost===0?CALM:lost===count?SCAR:PURPLES[2],label:`${lost} of ${count}`};
+ if(layer==='value'){const mean=average(homes.map(h=>Number(h.value)));return {bg:lost===count?SCAR:CARAMELS[bin(mean/initialMax)],label:thousands(mean)};}
+ if(!field)return neutral;
+ const values=homes.map(h=>field.values.get(h.id)).filter(v=>v!==undefined);
+ if(!values.length)return neutral;
+ const mean=average(values),disaster=layer!=='income_field',floor=field.floor??field.min,fraction=field.max===floor?.5:(mean-floor)/(field.max-floor);
+ const label=layer==='income_field'?thousands(mean):layer==='exposure'?`${(mean*100).toFixed(1)}%`:mean.toFixed(1);
+ return {bg:disaster&&mean<=floor?CALM:(disaster?PURPLES:CARAMELS)[bin(fraction)],label};
+}
 function byHome(policies){const map=new Map();for(const c of policies){if(!map.has(c.home))map.set(c.home,[]);map.get(c.home).push(c);}return map;}
 function renderLegend(layer,field,f,policyMap,person){
  const item=(bg,label,count)=>`<span class="lg"><i class="sw" style="background:${bg}"></i>${label}${count===undefined?'':` <b>${count}</b>`}</span>`;
@@ -545,10 +602,11 @@ function renderLegend(layer,field,f,policyMap,person){
 function homeTip(h){
  const f=frames[period],layer=currentLayer(),field=fieldFor(layer),displaced=displacedResident(h),firm=data.insurance_assignments?.[h.id],at=covered(f).filter(c=>c.home===h.id);
  const rows=[h.destroyed?'Destroyed, uninhabitable':`Value ${money(h.value)}`,`Owner ${h.owner}`];
+ const neighbors=f.homes.filter(x=>x.position.join(',')===h.position.join(','));rows.push(`Neighborhood mean value ${money(neighbors.reduce((n,x)=>n+Number(x.value),0)/neighbors.length)}`);
  rows.push(h.resident!==null?`Resident ${h.resident}`:displaced!==null?`Resident ${displaced} displaced`:'No resident');
  if(field&&field.values.has(h.id))rows.push(`${field.label}: ${field.format(field.values.get(h.id))}`);
  if(['coverage','insurers'].includes(layer)){rows.push(`Assigned to ${firm?firmName(firm):'no insurer'}`);rows.push(at.length?at.map(c=>`${c.product} with ${firmName(c.firm)}`).join(', '):'No active policy');}
- return `<b>Home ${h.id}</b><div class="sub">Row ${h.position[0]}, column ${h.position[1]}</div>${rows.map(r=>`<div>${r}</div>`).join('')}`;
+ return `<b>Home ${h.id}</b><div class="sub">Row ${h.position[0]}, column ${h.position[1]}, ${regionSize(h)===1?'1 home':`${regionSize(h)} homes`} in this neighborhood</div>${rows.map(r=>`<div>${r}</div>`).join('')}`;
 }
 $('grid').onpointerover=e=>{const b=e.target.closest('[data-home]');if(!b)return;const h=frames[period].homes.find(x=>x.id===Number(b.dataset.home));showTip(homeTip(h),e.clientX,e.clientY);};
 $('grid').onpointermove=e=>{if(!$('tip').hidden&&e.target.closest('[data-home]'))showTip($('tip').innerHTML,e.clientX,e.clientY);};
@@ -568,7 +626,9 @@ $('lensTitle').textContent=lensNames[layer];$('lensWhen').textContent=`in “${w
 f.homes.forEach(h=>{let b=buttons.get(h.id),at=policyMap.get(h.id)||[];b.className='cell';b.tabIndex=panelTab==='people'?0:-1;const displaced=displacedResident(h);const assignedFirm=data.insurance_assignments?.[h.id];b.style.setProperty('--insurer-border','transparent');
  const look=cellLook(layer,h,at,field,withValues);b.style.background=look.bg;b.style.color=look.fg;if(look.mark){b.classList.add('scarred');b.style.setProperty('--mark',look.mark);}
  if(active&&person&&h.owner===id)b.classList.add('selected');if(active&&!person){const matches=layer==='coverage'?at.some(c=>c.firm===id):(assignedFirm===id||(!assignedFirm&&at.some(c=>c.firm===id)));if(matches){b.classList.add('insurer-match');b.style.setProperty('--insurer-border',firmBorder(id));}}if(active&&person&&h.resident===id)b.classList.add('residence');if(hits.has(h.position.join(',')))b.classList.add('hit');
- b.textContent=look.label;let label=`Home ${h.id}, row ${h.position[0]}, column ${h.position[1]}, owner ${h.owner}, resident ${h.resident??'none'}${displaced!==null?`, displaced resident ${displaced}`:''}, ${h.destroyed?'destroyed':'intact'}, value ${money(h.value)}, assigned insurer ${assignedFirm?firmName(assignedFirm):'none'}`;if(field)label+=`, ${field.label}: ${field.values.has(h.id)?field.format(field.values.get(h.id)):'not applicable'}`;b.setAttribute('aria-label',label);});
+ b.textContent=look.label;b.classList.toggle('long-label',look.label.length>3);let label=`Home ${h.id}, row ${h.position[0]}, column ${h.position[1]}, owner ${h.owner}, resident ${h.resident??'none'}${displaced!==null?`, displaced resident ${displaced}`:''}, ${h.destroyed?'destroyed':'intact'}, value ${money(h.value)}, assigned insurer ${assignedFirm?firmName(assignedFirm):'none'}`;if(field)label+=`, ${field.label}: ${field.values.has(h.id)?field.format(field.values.get(h.id)):'not applicable'}`;b.setAttribute('aria-label',label);});
+const homesByRegion=new Map();for(const h of f.homes){const key=h.position.join(',');if(!homesByRegion.has(key))homesByRegion.set(key,[]);homesByRegion.get(key).push(h);}
+for(const block of blocks){const summary=regionSummary(layer,homesByRegion.get(block.key),field),head=heads.get(block.key);head.textContent=summary.label;head.style.background=summary.bg;head.style.color=inkOn(summary.bg);}
 renderLegend(layer,field,f,policyMap,active&&person);
 $('insurerFocus').hidden=!active||person;if(active&&!person){const count=$('grid').querySelectorAll('.insurer-match').length;$('insurerFocusLabel').textContent=`${firmName(id)} insurance: ${count} ${layer==='coverage'?'currently covered':'assigned'} homes outlined.`;}
 if(active){const selectedTransfers=f.transfers.filter(t=>person?(t.person===id||t.recipient===id):t.firm===id);let stats=[];if(person){let p=f.people.find(p=>p.id===id),wealth=owned.reduce((n,h)=>n+Number(h.value),0);let roles=[];if(residence)roles.push(residence.owner===id?'Owner-occupier':'Renter');else roles.push(frames[0].homes.some(h=>h.resident===id)&&f.homes.some(h=>displacedResident(h)===id)?'Displaced, no current residence':'No residence');if(owned.some(h=>h.resident!==null&&h.resident!==id))roles.push('landlord');if(owned.some(h=>h.destroyed))roles.push('owns destroyed titles');$('agentTitle').textContent=`Person ${id}`;$('roles').textContent=roles.join(', ');stats=[['Cash',money(p.cash)],['Property wealth',money(wealth)],['Net position',money(Number(p.cash)+wealth)],['Annual external income',money(p.annual_income)],['Owned titles',owned.length],['Current policies',relevant.length]];}else{let firm=f.firms.find(x=>x.id===id);$('agentTitle').textContent=`${firmName(id)} insurance`;$('roles').textContent=(Number(firm.capital)>0?'Capital available':'Capital exhausted')+(relevant.length?'':', no current policies');const ts=frames.slice(0,period+1).flatMap(f=>f.transfers).filter(t=>t.firm===id);const sum=(kind,key)=>ts.filter(t=>t.kind===kind).reduce((n,t)=>n+Number(t[key]||0),0);stats=[['Capital',money(firm.capital)],['Current policies',relevant.length],['Premium receipts to date',money(sum('premium','amount'))],['Claims due to date',money(sum('claim','due'))],['Claims paid to date',money(sum('claim','amount'))],['Shortfall to date',money(sum('claim','shortfall'))]];}
@@ -804,7 +864,7 @@ $('ribbon').onpointerleave=hideTip;
 
 /* Small multiples: one plate per field, and one per world. */
 const atlasPlates=[['damage','Damage','Gray: not struck. Purple: destroyed.'],['observed_hits','Observed hits','Gray: never struck. Darker: struck more often.'],['exposure','Hit probability','Gray: under 1% per period. Darker: riskier.'],['value','Home values','Darker caramel: higher value. Purple: destroyed.'],['income_field','Initial resident income','Darker caramel: higher income. Corner: destroyed.'],['coverage','Coverage','Insurer colors. Gray: no active policy.']];
-function miniMap(homes,fill){const [rows,columns]=shape;return `<svg viewBox="0 0 ${columns} ${rows}" aria-hidden="true">${homes.map(h=>{const look=fill(h);return `<rect x="${h.position[1]+.04}" y="${h.position[0]+.04}" width=".92" height=".92" fill="${look.bg}"/>${look.mark?`<path d="M${h.position[1]+.96} ${h.position[0]+.04}v.28h-.28z" fill="${look.mark}"/>`:''}`;}).join('')}</svg>`;}
+function miniMap(homes,fill){const [rows,columns]=shape;return `<svg viewBox="0 0 ${columns} ${rows}" aria-hidden="true">${homes.map(h=>{const look=fill(h),s=spots.get(h.id),corner=Math.min(s.w,s.h)*.3;return `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${look.bg}"/>${look.mark?`<path d="M${s.x+s.w} ${s.y}v${corner}h${-corner}z" fill="${look.mark}"/>`:''}`;}).join('')}${blocks.map(b=>`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="none" stroke="var(--page)" stroke-width=".07"/>`).join('')}</svg>`;}
 atlasPlates.forEach(([layer,title,caption])=>{const b=document.createElement('button');b.className='plate';b.dataset.field=layer;b.setAttribute('aria-label',`Open ${title} on the world map`);b.innerHTML=`<span class="mini"></span><strong>${title}</strong><span class="cap">${caption}</span>`;b.onclick=()=>{setLayer(layer);showView('map');render();};$('atlas').append(b);});
 Object.keys(worlds).forEach(name=>{const b=document.createElement('button');b.className='plate';b.dataset.plateWorld=name;b.innerHTML=`<span class="mini"></span><strong>“${name}”</strong><span class="cap"></span>`;b.onclick=()=>setWorld(name);$('worldPlates').append(b);});
 $('worldCompare').hidden=Object.keys(worlds).length<2;
@@ -844,7 +904,7 @@ function renderResearch(){
  $('insurerLeaderboard').innerHTML=f.firms.map(firm=>`<tr><td><button data-inspect-firm="${firm.id}">${firmName(firm.id)}</button></td><td>${money(firm.capital)}</td><td>${policies.filter(c=>c.firm===firm.id).length}</td><td>${money(sum('premium','amount',firm.id))}</td><td>${money(sum('claim','due',firm.id))}</td><td>${money(sum('claim','amount',firm.id))}</td><td>${money(sum('claim','shortfall',firm.id))}</td></tr>`).join('');
  $('insurerLeaderboard').querySelectorAll('[data-inspect-firm]').forEach(b=>b.onclick=()=>{showView('map');panelTab='people';selectedKind='firm';selectedId=Number(b.dataset.inspectFirm);render();});
  const settings=data.diagnostics?.settings;
- $('setupFacts').textContent=settings?`Seed ${data.configuration.seed}. Reference price ${money(settings.reference_price)}. Log-price spread ${settings.price_spread}. Price smoothing ${settings.price_length_scale}. Placement noise ${settings.placement_noise}. Risk contrast ${settings.risk_contrast}. Risk smoothing ${settings.risk_length_scale}. Footprint ${settings.footprint.join(' × ')}.`:'Initialization metadata is unavailable in this snapshot. Recorded price and income fields remain inspectable.';
+ $('setupFacts').textContent=settings?`Seed ${data.configuration.seed}. Reference price ${money(settings.reference_price)}. Log-price spread ${settings.price_spread}. Spread among homes in a neighborhood ${settings.home_price_spread}. Price smoothing ${settings.price_length_scale}. Placement noise ${settings.placement_noise}. Risk contrast ${settings.risk_contrast}. Risk smoothing ${settings.risk_length_scale}. Mean homes per neighborhood ${settings.homes_per_region}. Neighborhood size contrast ${settings.region_size_contrast}. Neighborhood size smoothing ${settings.region_size_length_scale}. Disaster radius ⌊Y⌋ neighborhoods, with Y Tweedie of mean ${settings.radius_mean} and dispersion ${settings.radius_dispersion}.`:'Initialization metadata is unavailable in this snapshot. Recorded price and income fields remain inspectable.';
 }
 $('researchMetric').onchange=renderResearch;
 $('outcomeMetric').onchange=renderOutcomes;
@@ -853,7 +913,7 @@ function peakExposure(){let peak=0;for(const w of Object.values(worlds)){const f
 const exposureFloor=.01,exposurePeak=peakExposure();
 function fieldFor(layer){
  const first=frames[0],values=new Map(),info={values,label:'',note:'',format:v=>Number(v).toLocaleString('en-US',{maximumFractionDigits:3})};
- const names={income_field:'Initial resident annual income',exposure:'Probability of at least one hit',observed_hits:'Cumulative disaster footprint hits'};
+ const names={income_field:'Initial resident annual income',exposure:'Probability of at least one hit',observed_hits:'Cumulative disaster hits'};
  if(!names[layer])return null;info.label=names[layer];
  if(layer==='income_field')info.format=money;
  const exposure=data.diagnostics?.hit_probability_per_event;
@@ -863,7 +923,7 @@ function fieldFor(layer){
  const rate=data.rates?.[Math.max(0,period-1)]??0;
  for(const home of first.homes){const [row,col]=home.position;const value=layer==='income_field'?income.get(home.resident):layer==='observed_hits'?(hits.get(home.position.join(','))||0):1-Math.exp(-rate*exposure[row][col]);if(value!==undefined)values.set(home.id,value);}
  if(layer==='exposure')info.format=v=>(v*100).toFixed(2)+'%';
- info.note={income_field:'Fixed annual income of the initial resident at each location, not current occupancy. A corner mark means that home has since been destroyed.',exposure:`Research-only probability of at least one hit in ${period===0?'the first exposure period':`period ${period}`}, including overlapping footprints (event rate ${rate.toFixed(3)}). Same scale across periods and worlds. Gray means under 1%. A corner mark means the home has already been destroyed.`,observed_hits:'All sampled footprints through the selected period, including repeated hits on destroyed homes. This counts exposure, not new losses. Gray means never struck.'}[layer];
+ info.note={income_field:'Fixed annual income of the initial resident at each location, not current occupancy. A corner mark means that home has since been destroyed.',exposure:`Research-only probability of at least one hit in ${period===0?'the first exposure period':`period ${period}`}, across every disaster zone that could reach the neighborhood (event rate ${rate.toFixed(3)}). Same scale across periods and worlds. Gray means under 1%. A corner mark means the home has already been destroyed.`,observed_hits:'All sampled disaster zones through the selected period, including repeated hits on destroyed homes. This counts exposure, not new losses. Gray means never struck.'}[layer];
  info.min=Math.min(...values.values());info.max=Math.max(...values.values());
  if(layer==='exposure'){info.floor=exposureFloor;info.min=0;info.max=Math.max(exposureFloor*2,exposurePeak);}
  if(layer==='observed_hits'){info.floor=0;info.min=0;info.max=Math.max(1,...allHits.values());}

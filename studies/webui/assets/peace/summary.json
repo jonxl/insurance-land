@@ -3,10 +3,13 @@
     "name": "Peace",
     "chaos_rate_ratio": 10.0,
     "seed": 42,
-    "rows": 16,
-    "columns": 16,
+    "rows": 8,
+    "columns": 8,
     "periods": 120,
-    "rate": 0.5
+    "rate": 0.5,
+    "homes_per_region": 4,
+    "radius_mean": 0.3,
+    "radius_dispersion": 1.5
   },
   "rates": [
     0.5,
@@ -136,8 +139,8 @@
   "expected_event_mean": 0.5,
   "event_variance": 0.49828667750000005,
   "expected_event_variance": 0.5,
-  "noise_center_variance": 0.9997989949002513,
-  "destroyed": 158,
-  "claims_due": 39484200.0,
-  "claims_paid": 30038375.0
+  "noise_center_variance": 0.9819604770370788,
+  "destroyed": 115,
+  "claims_due": 28738500.0,
+  "claims_paid": 27757775.0
 }

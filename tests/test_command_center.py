@@ -23,6 +23,22 @@ def test_invalid_run_settings(values):
         parse_spec(values)
 
 
+def test_homes_per_region_reaches_the_world_and_counts_toward_the_limit():
+    spec = parse_spec({"rows": 3, "columns": 3, "homes_per_region": 2, "periods": 2})
+    assert len(spec.create().homes) == 18
+    with pytest.raises(ValueError, match="home-periods"):
+        parse_spec({"rows": 32, "columns": 32, "homes_per_region": 16, "periods": 10})
+    with pytest.raises(ValueError):
+        parse_spec({"homes_per_region": 0})
+
+
+def test_radius_settings_reach_the_disaster_config():
+    radius = parse_spec({"radius_mean": 0.2, "radius_dispersion": 1}).disasters().radius
+    assert (radius.mean, radius.dispersion) == (0.2, 1)
+    with pytest.raises(ValueError, match="radius_dispersion"):
+        parse_spec({"radius_dispersion": 0})
+
+
 def test_run_exports_selected_world_and_settings(tmp_path):
     spec = WorldSpec(name="Chaos", rows=3, columns=3, periods=2, seed=7)
     run_experiment(spec, tmp_path)

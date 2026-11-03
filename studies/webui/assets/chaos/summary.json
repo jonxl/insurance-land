@@ -3,10 +3,13 @@
     "name": "Chaos",
     "chaos_rate_ratio": 10.0,
     "seed": 42,
-    "rows": 16,
-    "columns": 16,
+    "rows": 8,
+    "columns": 8,
     "periods": 120,
-    "rate": 0.5
+    "rate": 0.5,
+    "homes_per_region": 4,
+    "radius_mean": 0.3,
+    "radius_dispersion": 1.5
   },
   "rates": [
     0.12748491955359736,
@@ -136,8 +139,8 @@
   "expected_event_mean": 0.4992077321498048,
   "event_variance": 0.6026180975000001,
   "expected_event_variance": 0.6023791931192737,
-  "noise_center_variance": 0.9997989949002513,
-  "destroyed": 167,
-  "claims_due": 43762904.17,
-  "claims_paid": 18566608.89
+  "noise_center_variance": 0.9819604770370788,
+  "destroyed": 195,
+  "claims_due": 56554051.41,
+  "claims_paid": 19261967.21
 }

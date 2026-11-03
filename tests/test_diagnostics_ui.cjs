@@ -7,6 +7,17 @@ const context=vm.createContext({});
 vm.runInContext(html.slice(html.indexOf('function metricValues('),html.indexOf('function diagnosticPlot(')),context);
 const {distribution,metricValues,ranks}=context;
 
+vm.runInContext(html.slice(html.indexOf('function treemap('),html.indexOf('const regionMembers=')),context);
+test('treemap sizes blocks by home count, fills the map and keeps grid order',()=>{
+ const items=[[0,0,6],[0,1,2],[1,0,1],[1,1,7]].map(([row,col,count])=>({row,col,count}));
+ const blocks=context.treemap(items,0,0,2,2);
+ const area=blocks.reduce((n,b)=>n+b.w*b.h,0);
+ assert.ok(Math.abs(area-4)<1e-9);
+ for(const b of blocks)assert.ok(Math.abs(b.w*b.h-4*b.count/16)<1e-9);
+ const at=(r,c)=>blocks.find(b=>b.row===r&&b.col===c);
+ assert.ok(at(0,0).x<at(0,1).x&&at(1,0).x<at(1,1).x);
+ assert.ok(at(0,0).y<at(1,0).y&&at(0,1).y<at(1,1).y);
+});
 test('Lorenz and Gini handle equality, concentration, and zero totals',()=>{
  assert.equal(distribution([{value:5},{value:5}]).gini,0);
  const concentrated=distribution([{value:0},{value:10}]);

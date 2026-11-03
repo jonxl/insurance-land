@@ -16,15 +16,66 @@ import matplotlib.pyplot as plt
 import numpy as np
 from cycler import cycler
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap, to_hex
+from matplotlib.patches import Rectangle
 
 from experiments.recording import WorldRecorder
 from experiments.standard import StandardWorld
 from factories import GridPopulationFactory
-from utils.distributions import numpy_stream, price_field, sample_disasters, smooth_field
+from utils.distributions import (
+    numpy_stream,
+    price_field,
+    sample_disasters,
+    smooth_field,
+)
 
 # Palette from plans/active/figures/generate_distribution_figures.py.
 BLUE, ORANGE, PURPLE = "#245b91", "#ba5a22", "#6a51a3"
 VARIANCE_COLORS = LinearSegmentedColormap.from_list("report_variance", [BLUE, "#ffffff", ORANGE])
+
+
+def treemap(items: list[tuple], x: float, y: float, w: float, h: float) -> list[tuple]:
+    """Lay (row, column, count, ...) items out by grid position, with area by count."""
+    if len(items) == 1:
+        return [(items[0], x, y, w, h)]
+    wide = w >= h
+    ordered = sorted(items, key=lambda i: (i[1], i[0]) if wide else (i[0], i[1]))
+    total = sum(i[2] for i in ordered)
+    left, cut = ordered[0][2], 1
+    while cut < len(ordered) - 1 and abs(total - 2 * (left + ordered[cut][2])) < abs(
+        total - 2 * left
+    ):
+        left += ordered[cut][2]
+        cut += 1
+    share = left / total
+    if wide:
+        return treemap(ordered[:cut], x, y, w * share, h) + treemap(
+            ordered[cut:], x + w * share, y, w * (1 - share), h
+        )
+    return treemap(ordered[:cut], x, y, w, h * share) + treemap(
+        ordered[cut:], x, y + h * share, w, h * (1 - share)
+    )
+
+
+def home_tiles(homes, shape: tuple[int, int]) -> tuple[list[tuple], list[tuple]]:
+    """Each home's (owner, x, y, w, h) and each neighborhood's (x, y, w, h) in map units."""
+    regions: dict[tuple[int, int], list[int]] = {cell: [] for cell in np.ndindex(shape)}
+    for home in homes:
+        regions[home.position].append(home.owner_id)
+    items = [(row, column, len(owners), owners) for (row, column), owners in regions.items()]
+    tiles, blocks = [], []
+    for (_, _, _, owners), x, y, w, h in treemap(items, 0, 0, shape[1], shape[0]):
+        blocks.append((x, y, w, h))
+        members = [(i, i, 1, owner) for i, owner in enumerate(owners)]
+        tiles += [(m[3], *box) for m, *box in treemap(members, x, y, w, h)]
+    return tiles, blocks
+
+
+def region_means(homes, values: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    totals, counts = np.zeros(shape), np.zeros(shape)
+    for home, value in zip(homes, values, strict=True):
+        totals[home.position] += value
+        counts[home.position] += 1
+    return totals / counts
 
 
 def generate(output: Path, spec: StandardWorld, draws: int) -> dict[str, object]:
@@ -54,33 +105,53 @@ def generate(output: Path, spec: StandardWorld, draws: int) -> dict[str, object]
     scenario = GridPopulationFactory.create(spec.population())
     world = spec.create()
     shape = (spec.rows, spec.columns)
-    prices = np.array([float(h.market_value) for h in scenario.homes]).reshape(shape)
+    prices = np.array([float(h.market_value) for h in scenario.homes])
     incomes = np.array([float(p.annual_income or Decimal(0)) for p in scenario.people])
     counts = np.bincount([h.owner_id - 1 for h in scenario.homes], minlength=len(incomes))
-    residents = np.array([(h.occupant_id or 0) - 1 for h in scenario.homes]).reshape(shape)
-    owners = np.array([h.owner_id for h in scenario.homes]).reshape(shape)
+    residents = np.array([(h.occupant_id or 0) - 1 for h in scenario.homes])
+    owners = np.array([h.owner_id for h in scenario.homes])
+    tiles, blocks = home_tiles(scenario.homes, shape)
     owner_ids = np.unique(owners)
     # Categorical colors: labels identify owners even when shades look similar.
     colors = plt.get_cmap("Set3")(np.arange(len(owner_ids)) % 12)
     ownership_cmap = ListedColormap(colors)
-    owner_indices = np.searchsorted(owner_ids, owners)
+
+    def draw_owners(ax, fontsize: float, *, gap: float) -> None:
+        for owner, x, y, width, height in tiles:
+            color = colors[int(np.searchsorted(owner_ids, owner))]
+            ax.add_patch(Rectangle((x - 0.5, y - 0.5), width, height, fc=color, ec="white", lw=gap))
+            size = fontsize * min(1, 2 * width)
+            ax.text(
+                x - 0.5 + width / 2,
+                y - 0.5 + height / 2,
+                str(owner),
+                ha="center",
+                va="center",
+                fontsize=size,
+            )
+        ax.set_xlim(-0.5, spec.columns - 0.5)
+        ax.set_ylim(spec.rows - 0.5, -0.5)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for x, y, width, height in blocks:
+            ax.add_patch(
+                Rectangle((x - 0.5, y - 0.5), width, height, fill=False, ec="#17252c", lw=gap * 2)
+            )
+
     probabilities = spec.disasters().risk_probabilities(shape, seed=spec.seed)
-    exposure = np.zeros(shape)
-    for a in range(probabilities.shape[0]):
-        for b in range(probabilities.shape[1]):
-            exposure[a : a + 3, b : b + 3] += probabilities[a, b]
+    exposure = spec.disasters().hit_probabilities(shape, seed=spec.seed)
     fig, axes = plt.subplots(2, 2, figsize=(11, 9))
     for ax, data, title, cmap in zip(
         axes.flat,
         [
-            prices / 1000,
-            incomes[residents] / 1000,
-            owner_indices,
+            region_means(scenario.homes, prices, shape) / 1000,
+            region_means(scenario.homes, incomes[residents], shape) / 1000,
+            np.full(shape, np.nan),
             100 * (1 - np.exp(-spec.rate * exposure)),
         ],
         [
-            "Initial home price ($ thousands)",
-            "Resident annual income ($ thousands)",
+            "Mean initial home price in each region ($ thousands)",
+            "Mean resident annual income in each region ($ thousands)",
             "Ownership map (labels = owner IDs)",
             "Disaster exposure per period (%)",
         ],
@@ -102,46 +173,49 @@ def generate(output: Path, spec: StandardWorld, draws: int) -> dict[str, object]
         ax.tick_params(which="minor", bottom=False, left=False)
         ax.set(title=title, xlabel="Column", ylabel="Row")
         if is_ownership:
-            for (row, column), owner in np.ndenumerate(owners):
-                ax.text(column, row, str(owner), ha="center", va="center", fontsize=5)
+            ax.set(xlabel="", ylabel="")
+            draw_owners(ax, 5, gap=0.3)
         else:
             fig.colorbar(im, ax=ax, shrink=0.75)
     save(
         "01-world",
-        "Researcher view of the initialized world. Risk is hidden from agents. "
+        "Researcher view of the initialized world. Each cell is a region holding one or more "
+        "homes. Risk is hidden from agents. "
         "Ownership labels identify people, not wealth. Colors are categorical and reused; "
         "use the labeled ownership map and owner key below to trace a person's homes. "
-        "The purple map gives each home’s percentage chance of at least one disaster hit "
+        "The purple map gives each region’s percentage chance of at least one disaster hit "
         "during a period. Darker means greater exposure.",
     )
 
     fig, ax = plt.subplots(figsize=(11, 11))
-    ax.imshow(owner_indices, cmap=ownership_cmap, vmin=-0.5, vmax=len(owner_ids) - 0.5)
-    for (row, column), owner in np.ndenumerate(owners):
-        ax.text(column, row, str(owner), ha="center", va="center", fontsize=9)
-    ax.set_xticks(np.arange(-0.5, spec.columns), minor=True)
-    ax.set_yticks(np.arange(-0.5, spec.rows), minor=True)
-    ax.grid(which="minor", color="white", linewidth=2)
-    ax.tick_params(which="minor", bottom=False, left=False)
+    draw_owners(ax, 9, gap=0.8)
+    ax.set_aspect("equal")
     ax.set(
-        title="Who owns each home?\nEach cell label is an owner ID", xlabel="Column", ylabel="Row"
+        title="Who owns each home?\nEach outlined block is a neighborhood, sized by its homes",
     )
     save(
         "01-ownership",
-        "Each square is a home. Repeated IDs identify the same owner, "
+        "Each outlined block is a neighborhood, sized by its homes; each square is a home. "
+        "Repeated IDs identify the same owner, "
         "including disconnected properties. Colors do not encode a quantity. "
         '<a href="ownership.html">Open the selectable owner key and map</a>.',
     )
 
     cells = []
-    for (row, column), owner in np.ndenumerate(owners):
+    for owner, x, y, width, height in tiles:
         color = to_hex(colors[int(np.searchsorted(owner_ids, owner))])
+        size = 12 * min(1, 2 * width)
         cells.append(
-            f'<g data-owner="{owner}"><rect x="{column * 40}" y="{row * 40}" '
-            f'width="40" height="40" fill="{color}" stroke="white"/>'
-            f'<text x="{column * 40 + 20}" y="{row * 40 + 24}" text-anchor="middle" '
-            f'font-size="12" fill="#17252c">{owner}</text></g>'
+            f'<g data-owner="{owner}"><rect x="{x * 40:.2f}" y="{y * 40:.2f}" '
+            f'width="{width * 40:.2f}" height="{height * 40:.2f}" fill="{color}" stroke="white"/>'
+            f'<text x="{(x + width / 2) * 40:.2f}" y="{(y + height / 2) * 40 + size / 3:.2f}" '
+            f'text-anchor="middle" font-size="{size:.1f}" fill="#17252c">{owner}</text></g>'
         )
+    cells.extend(
+        f'<rect x="{x * 40:.2f}" y="{y * 40:.2f}" width="{w * 40:.2f}" height="{h * 40:.2f}" '
+        'fill="none" stroke="#17252c" pointer-events="none"/>'
+        for x, y, w, h in blocks
+    )
     buttons = []
     for owner, color in zip(owner_ids, colors, strict=True):
         owned = int(counts[owner - 1])
@@ -163,13 +237,14 @@ def generate(output: Path, spec: StandardWorld, draws: int) -> dict[str, object]
         "#key{max-height:75vh;overflow:auto}g.dim{opacity:0.12}"
         "@media(max-width:700px){.layout{grid-template-columns:1fr}}</style>"
         "<h1>Who owns each home?</h1><p>Select an owner in the key to highlight all their "
-        "properties. Cell labels are owner IDs; colors are categorical and reused. "
+        "properties. Outlined blocks are neighborhoods; labels are owner IDs; colors are "
+        "categorical and reused. "
         "Homes in separate locations can belong to the same person.</p>"
         '<button id="reset">Show all owners</button><p id="status" aria-live="polite">'
         f"{len(owner_ids)} owners · {owners.size} homes. "
         "People without homes are omitted from the key."
         '</p><div class="layout">'
-        f'<svg role="img" aria-label="Home grid labeled by owner ID" '
+        f'<svg role="img" aria-label="Regions of homes labeled by owner ID" '
         f'viewBox="0 0 {spec.columns * 40} {spec.rows * 40}">' + "".join(cells) + "</svg>"
         '<section aria-label="Owner key"><h2>Owner key</h2><div id="key">'
         + "".join(buttons)
@@ -276,6 +351,8 @@ def generate(output: Path, spec: StandardWorld, draws: int) -> dict[str, object]
 
     count_rng = numpy_stream(spec.seed, "diagnostic-counts")
     location_rng = numpy_stream(spec.seed, "diagnostic-locations")
+    size_rng = numpy_stream(spec.seed, "diagnostic-sizes")
+    radius = spec.disasters().radius
     event_counts = np.empty(draws, dtype=np.int64)
     anchor_counts = np.zeros(probabilities.shape, dtype=np.int64)
     home_hits = np.zeros(shape, dtype=np.int64)
@@ -283,9 +360,9 @@ def generate(output: Path, spec: StandardWorld, draws: int) -> dict[str, object]
         anchors = sample_disasters(spec.rate, probabilities, count_rng, location_rng=location_rng)
         event_counts[i] = len(anchors)
         hit = np.zeros(shape, dtype=bool)
-        for a, b in anchors:
+        for (a, b), r in zip(anchors, radius.sample(len(anchors), size_rng), strict=True):
             anchor_counts[a, b] += 1
-            hit[a : a + 3, b : b + 3] = True
+            hit[max(0, a - r) : a + r + 1, max(0, b - r) : b + r + 1] = True
         home_hits += hit
     observed = anchor_counts / max(int(anchor_counts.sum()), 1)
     fig, axes = plt.subplots(1, 3, figsize=(13, 4))
@@ -319,7 +396,7 @@ def generate(output: Path, spec: StandardWorld, draws: int) -> dict[str, object]
     save(
         "04-disasters",
         "Independent numerical draws, without destroying a live world. "
-        "Counts, anchor selection, and overlapping footprint exposure are tested separately.",
+        "Counts, center selection, and exposure across disaster sizes are tested separately.",
     )
 
     initial_capital = {i: float(f.capital) for i, f in world.insurers.items()}
@@ -423,8 +500,11 @@ def generate(output: Path, spec: StandardWorld, draws: int) -> dict[str, object]
         "color:#17252c}img{width:100%}figure{margin:35px 0}figcaption{color:#425660}"
         "pre{overflow:auto;background:#f3f5f6;padding:20px}</style><h1>Standard world "
         "diagnostics</h1>"
-        f"<p>Seed {spec.seed}; {spec.rows} × {spec.columns} homes; constant rate {spec.rate}; "
-        "3 × 3 footprints; hidden risk contrast 1. Income and ownership exponents 2 and 3. "
+        f"<p>Seed {spec.seed}; {spec.rows} × {spec.columns} regions, {len(owners)} homes; "
+        f"constant rate {spec.rate}; "
+        f"disaster radius floor(Y), Y Tweedie of mean {spec.radius_mean} and dispersion "
+        f"{spec.radius_dispersion}; hidden risk contrast 1. "
+        "Income and ownership exponents 2 and 3. "
         "Reference price $250,000, price spread 0.4, smoothing length 2, placement noise 0.1. "
         "Initial cash $10,000 per person and $10 million per insurer; mean annual income "
         "$50,000.</p>"

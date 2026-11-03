@@ -13,7 +13,7 @@ from domain.insurance import Insurer, InsurerObservation, Offer, Product
 from environment import Environment
 from experiments.portfolios import insurer_portfolios
 from factories import EnvironmentFactory, GridPopulationConfig, GridPopulationFactory
-from utils.distributions import PowerLorenz
+from utils.distributions import PowerLorenz, TweedieRadius
 
 
 @dataclass(frozen=True)
@@ -21,12 +21,17 @@ class WorldSpec:
     name: Literal["Peace", "Standard", "Chaos"] = "Standard"
     chaos_rate_ratio: float = 10.0
     seed: int = 42
-    rows: int = 16
-    columns: int = 16
+    rows: int = 8
+    columns: int = 8
     periods: int = 120
-    rate: float = 0.5
+    rate: float | None = None
+    homes_per_region: int = 4
+    radius_mean: float = 0.3
+    radius_dispersion: float = 1.5
 
     def __post_init__(self) -> None:
+        if self.rate is None:
+            object.__setattr__(self, "rate", 0.1 if self.name == "Standard" else 0.5)
         if type(self.periods) is not int or self.periods <= 0:
             raise ValueError("periods must be a positive integer")
         if self.name not in ("Peace", "Standard", "Chaos"):
@@ -39,24 +44,31 @@ class WorldSpec:
             raise ValueError("World requires a grid at least 3 by 3")
 
     def population(self) -> GridPopulationConfig:
-        config = GridPopulationConfig(rows=self.rows, columns=self.columns, seed=self.seed)
+        config = GridPopulationConfig(
+            rows=self.rows,
+            columns=self.columns,
+            seed=self.seed,
+            homes_per_region=self.homes_per_region,
+        )
         if self.name == "Peace":
             config = replace(
-                config, income_curve=PowerLorenz(1), ownership_curve=PowerLorenz(1), price_spread=0
+                config, income_curve=PowerLorenz(1),
+                ownership_curve=PowerLorenz(1),
+                price_spread=0,
+                home_price_spread=0,
             )
         return config
 
     def disasters(self) -> DisasterConfig:
         return DisasterConfig(
             rate=self.rate,
-            footprint_rows=3,
-            footprint_columns=3,
+            radius=TweedieRadius(self.radius_mean, self.radius_dispersion),
             risk_contrast=1,
             risk_length_scale=2,
         )
 
     def rates(self) -> tuple[float, ...]:
-        """Match expected event totals; Chaos ends at ratio times its starting rate."""
+        """Use rate as the period mean; Chaos ends at ratio times its starting rate."""
         if self.name != "Chaos" or self.periods == 1:
             return (self.rate,) * self.periods
         factors = [
