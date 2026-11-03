@@ -6,6 +6,7 @@ from typing import Any
 
 from agents.base import PayRent
 from environment import Environment, StepResult
+from experiments.viewer import export_viewer
 
 
 class WorldRecorder:
@@ -160,7 +161,4 @@ class WorldRecorder:
         serialized = json.dumps(self.data(), separators=(",", ":"))
         (output / "assets").mkdir(parents=True, exist_ok=True)
         (output / "assets" / "world-history.json").write_text(serialized + "\n")
-        template = Path(__file__).with_name("diagnostics.html").read_text()
-        (output / "diagnostics.html").write_text(
-            template.replace("__WORLD_DATA__", serialized.replace("<", "\\u003c"))
-        )
+        export_viewer(output)

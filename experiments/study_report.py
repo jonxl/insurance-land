@@ -11,6 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from experiments.viewer import export_viewer_assets
 from experiments.worlds import WorldSpec
 from utils.distributions import (
     numpy_stream,
@@ -372,36 +373,9 @@ def generate(output: Path, *, draws: int = 20000, field_samples: int = 500) -> N
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet"
 href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,200..900&display=swap">
-<style>
-:root{color-scheme:light;--page:#f8f2e8;--ink:#2e1c12;--muted:#6b5848}
-*{box-sizing:border-box}
-body{margin:0;font:17px/1.6 "Source Serif 4",Georgia,"Times New Roman",serif;
-background:var(--page);color:var(--ink)}
-h1,h2{margin:0;text-wrap:balance;font-weight:600}
-p{text-wrap:pretty}
-a{color:inherit}
-header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;
-gap:8px 32px;max-width:1200px;margin:0 auto;padding:16px 24px 0}
-h1{font-size:40px;line-height:1.1}
-main{max-width:1200px;margin:0 auto;padding:16px 24px 24px}
-main>p{max-width:72ch}
-nav{display:inline-flex;flex-wrap:wrap;gap:2px;padding:2px;margin:18px 0;background:#ece1cf;
-border-radius:8px}
-button{font:inherit;font-size:15px;color:inherit;background:transparent;border:0;
-border-radius:6px;padding:5px 14px;cursor:pointer}
-button:hover{background:#e0d3c0}
-button[aria-pressed=true]{background:var(--ink);color:#fff}
-:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-summary{cursor:pointer;color:var(--muted)}
-h2{font-size:26px;line-height:1.2}
-figure{margin:28px 0 40px}
-img{width:100%;display:block;background:#fff;border-radius:4px}
-figcaption,.facts{color:var(--muted)}
-figcaption{margin-top:8px;font-size:15px;max-width:80ch}
-.facts{font-variant-numeric:tabular-nums}
-.world-section[hidden]{display:none}
-@media(max-width:640px){header,main{padding-inline:16px}h1{font-size:32px}}
-</style><header><h1>Insurance Land</h1><a href="diagnostics.html">Open command center</a></header>
+<link rel="stylesheet" href="ui/study.css">
+<header><h1>Insurance Land</h1>
+<a href="diagnostics.html">Open command center</a></header>
 <main>
 <p>The same five checks for “Peace”, “Standard”, and “Chaos”: initial geography, resource
 allocations,
@@ -430,15 +404,9 @@ it does not prove the model correct or establish causal findings from one seed.<
     html += (
         "</nav>"
         + "".join(sections)
-        + """<script>
-function choose(name){document.querySelectorAll('.world-section').forEach(s=>s.hidden=s.id!==name);
-document.querySelectorAll('[data-world]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.world===name)));
-history.replaceState(null,'','#'+name);}
-document.querySelectorAll('[data-world]').forEach(b=>b.onclick=()=>choose(b.dataset.world));
-choose(['peace','standard','chaos'].includes(location.hash.slice(1))?location.hash.slice(1):'standard');
-addEventListener('load',()=>scrollTo(0,0));
-</script></main></html>"""
+        + """<script type="module" src="ui/study.js"></script></main></html>"""
     )
+    export_viewer_assets(output)
     (output / "index.html").write_text(html)
 
 

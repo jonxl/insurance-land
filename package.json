@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun --bun tsc",
+    "check": "bun --bun tsc --noEmit",
+    "test": "bun run build && bun test ./tests/test_diagnostics_ui.cjs ./tests/test_world_library_ui.cjs ./tests/test_viewer_loading.js",
+    "watch": "bun --bun tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "bun@1.2.18"
+}

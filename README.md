@@ -17,6 +17,23 @@ The included reference experiments are **Dev Peace**, **Dev Standard**, and **De
 
 See [getting started](docs/getting-started.md) for server options, saved results, and regenerating the reference experiments.
 
+## Frontend development
+
+Use **Bun** for frontend dependencies, TypeScript builds, and tests. The simulation and command-center server use Python with uv.
+
+With Bun 1.2.18 installed, run from the repository root:
+
+```bash
+bun install --frozen-lockfile
+bun run check
+bun run build
+bun run test
+```
+
+Edit TypeScript and CSS in [experiments/ui](experiments/ui) and the HTML shell in [experiments/diagnostics.html](experiments/diagnostics.html). Use `bun run watch` while editing TypeScript, then refresh the browser. Compiled JavaScript is included in the repository, so running the command center does not require Bun.
+
+See the [development guide](docs/development.md#command-center-development) for the build workflow and dependency management.
+
 ## Example snapshots
 
 These figures come from the recorded Standard experiment with seed 42 and 120 periods. They illustrate one seeded run using fixed baseline policies, not trained agents or calibrated predictions.

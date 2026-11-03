@@ -40,31 +40,39 @@ pytest discovers tests in `tests/`, adds the repository root to the import path,
 
 ## Command-center development
 
-Edit [experiments/diagnostics.html](../experiments/diagnostics.html), the source template, rather than a generated recording page. The local command center serves that template with the selected recording's data, so refreshing picks up template changes. Restart the server after changing Python code.
+The frontend uses Bun 1.2.18 as its package manager, script runtime, and test runner. Use Bun for all frontend commands; Python commands continue to use uv.
 
-Run the command-center checks and JavaScript interaction tests from the repository root. The JavaScript tests require Node.js and use its built-in test runner:
+Edit the HTML shell in [experiments/diagnostics.html](../experiments/diagnostics.html), and TypeScript and CSS in [experiments/ui](../experiments/ui). TypeScript compiles to browser JavaScript in `experiments/ui/dist/`; include those generated files with source changes so Python users can run the command center without installing frontend tools.
 
-```bash
-uv run pytest tests/test_command_center.py tests/test_worlds.py -q
-node tests/test_diagnostics_ui.cjs
-node tests/test_world_library_ui.cjs
-```
-
-These cover saved runs, progress, presets, experiment navigation, and timeline behavior. They do not replace browser checks of layout or animation.
-
-[.prettierrc.json](../.prettierrc.json) configures HTML and embedded CSS/JavaScript formatting with two-space indentation and a 100-character print width. With Node.js and npm available:
+From the repository root:
 
 ```bash
-npx prettier@3.8.2 --write experiments/diagnostics.html
+bun install --frozen-lockfile
+bun run check
+bun run build
+bun run test
+uv run pytest tests/test_command_center.py tests/test_worlds.py tests/test_viewer.py -q
 ```
 
-[.prettierignore](../.prettierignore) excludes generated recording pages because their embedded datasets are large. Generate distributable reference pages and figures from the source with `uv run python -m experiments.generate_worlds`; see [regeneration instructions](getting-started.md#regenerate-reference-recordings-and-figures).
+`bun run check` checks types without writing files. `bun run test` builds the browser modules and runs the interaction and loading tests with Bun. These cover saved runs, progress, presets, experiment navigation, timeline behavior, and recording loading. They do not replace browser checks of layout or animation.
+
+Run `bun run watch` while editing TypeScript. The command center serves the current HTML, CSS, and compiled JavaScript; refresh the browser after changes. Restart the server after changing Python code.
+
+[.prettierrc.json](../.prettierrc.json) configures two-space indentation and a 100-character print width. Format browser source with Bun:
+
+```bash
+bunx --bun prettier@3.8.2 --write experiments/diagnostics.html 'experiments/ui/*.ts' 'experiments/ui/*.css'
+```
+
+[.prettierignore](../.prettierignore) excludes generated browser files. Exported pages load their recording JSON separately. Rebuild TypeScript before regenerating distributable reference pages and figures with `uv run python -m experiments.generate_worlds`; see [regeneration instructions](getting-started.md#regenerate-reference-recordings-and-figures).
 
 ## Dependency management
 
-Use uv for dependency changes. Add application dependencies with `uv add <package>` and development tools with `uv add --dev <package>`. Keep `pyproject.toml` and `uv.lock` together when dependency requirements change.
+Use uv for Python dependency changes. Add application dependencies with `uv add <package>` and development tools with `uv add --dev <package>`. Keep `pyproject.toml` and `uv.lock` together when dependency requirements change.
 
 The project is configured as an application with `package = false`. Application packages live at the repository root. Run `uv run python main.py` from that directory.
+
+Use `bun add --dev <package>` for frontend development tools. Keep `package.json` and `bun.lock` together when dependencies change. Commit only the Bun frontend lockfile; use `bun install --frozen-lockfile` for reproducible installs.
 
 ## Test organization
 

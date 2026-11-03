@@ -7,6 +7,7 @@ from pathlib import Path
 
 from experiments.diagnostic_fields import diagnostic_fields
 from experiments.recording import WorldRecorder
+from experiments.viewer import export_viewer
 from experiments.worlds import WorldSpec
 
 
@@ -30,10 +31,7 @@ def generate(
     serialized = json.dumps(bundle, separators=(",", ":"))
     (output / "assets").mkdir(parents=True, exist_ok=True)
     (output / "assets" / "world-history.json").write_text(serialized + "\n")
-    template = Path(__file__).with_name("diagnostics.html").read_text()
-    (output / "diagnostics.html").write_text(
-        template.replace("__WORLD_DATA__", serialized.replace("<", "\\u003c"))
-    )
+    export_viewer(output)
     print(f"Diagnostics: {output / 'diagnostics.html'}")
 
 

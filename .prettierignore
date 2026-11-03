@@ -1,3 +1,6 @@
-# Generated recordings contain large embedded simulation datasets.
+# Generated browser exports; format the source files under experiments/ instead.
 studies/webui/diagnostics.html
 studies/webui/runs/
+studies/webui/ui/
+
+experiments/ui/dist/

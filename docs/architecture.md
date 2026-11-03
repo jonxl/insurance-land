@@ -44,7 +44,7 @@ insurance-land/
 | [factories/environment.py](../factories/environment.py) | Attach a separate house agent to each person and construct the environment |
 | [utils/validation](../utils/validation/) | Share money validation and unique-ID indexing helpers |
 
-The command center serves the current HTML template with a recording's data. Generated HTML files embed the same snapshot data for inspection. Saved runs live under the served directory's `runs/<id>/`; their manifests retain configuration and status across server restarts. See [saved experiments](getting-started.md#saved-experiments).
+The command center serves the HTML shell, CSS, and JavaScript compiled from TypeScript with Bun. Exported pages include those browser assets and load snapshot data separately from `assets/world-history.json`. Saved runs live under the served directory's `runs/<id>/`; their manifests retain configuration and status across server restarts. See [saved experiments](getting-started.md#saved-experiments).
 
 ## Construction and execution flow
 

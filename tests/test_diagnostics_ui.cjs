@@ -1,13 +1,17 @@
-const {test}=require('node:test');
+const {test,beforeAll}=require('bun:test');
 const assert=require('node:assert/strict');
 const {readFileSync}=require('node:fs');
 const vm=require('node:vm');
-const html=readFileSync('experiments/diagnostics.html','utf8');
+const appSource=readFileSync('experiments/ui/dist/app.js','utf8');
 const context=vm.createContext({});
-vm.runInContext(html.slice(html.indexOf('function metricValues('),html.indexOf('function diagnosticPlot(')),context);
-const {distribution,metricValues,ranks}=context;
+let distribution,metricValues,ranks;
+beforeAll(async()=>{
+ const metrics=await import('../experiments/ui/dist/metrics.js');
+ const {createEventHelpers}=await import('../experiments/ui/dist/events.js');
+ Object.assign(context,metrics,createEventHelpers({money:n=>"$"+Number(n),firmName:id=>"Firm "+id}));
+ ({distribution,metricValues,ranks}=metrics);
+});
 
-vm.runInContext(html.slice(html.indexOf('function treemap('),html.indexOf('const regionMembers =')),context);
 test('treemap sizes blocks by home count, fills the map and keeps grid order',()=>{
  const items=[[0,0,6],[0,1,2],[1,0,1],[1,1,7]].map(([row,col,count])=>({row,col,count}));
  const blocks=context.treemap(items,0,0,2,2);
@@ -36,8 +40,6 @@ test('equal values share leaderboard rank',()=>{
  assert.equal(result.get(1),1);assert.equal(result.get(2),1);assert.equal(result.get(3),3);
 });
 
-vm.runInContext(html.slice(html.indexOf('function summarizeOutcomes('),html.indexOf('function outcomePlot(')),context);
-vm.runInContext(html.slice(html.indexOf('function histogramBins('),html.indexOf('function histogramPlot(')),context);
 
 test('outcomes deduplicate coverage, exclude destroyed homes, and accumulate claims',()=>{
  const history=[
@@ -59,7 +61,7 @@ test('histogram preserves all observations including the maximum and zero-only s
  assert.equal(context.histogramBins([0,0,0]).counts[0],3);
 });
 
-vm.runInContext(html.slice(html.indexOf('const personColors ='),html.indexOf('const shape =')),context);
+vm.runInContext(appSource.slice(appSource.indexOf('const personColors ='),appSource.indexOf('const shape =')),context);
 test('person colors are stable, colorful, unique, and separated from firm colors',()=>{
  const colors=Array.from({length:1024},(_,i)=>context.ownerColor(i+1));
  assert.equal(new Set(colors).size,1024);
@@ -80,7 +82,6 @@ test('person colors stay out of the purple hues reserved for disasters',()=>{
  }
 });
 
-vm.runInContext('const money=n=>"$"+Number(n);const firmName=id=>"Firm "+id;'+html.slice(html.indexOf('function buildLog('),html.indexOf('const logCache =')),context);
 test('console log records collapses, disasters, claims, and unpaid rent',()=>{
  const firm=capital=>[{id:1,capital}];
  const log=context.buildLog([
@@ -154,7 +155,7 @@ test('timeline preserves claims without a linked disaster',()=>{
 
 test('full timeline contains every recorded stop and stays unchanged when the period moves',()=>{
  const timeline=vm.createContext({period:0,messageHtml:m=>m.key});
- vm.runInContext(html.slice(html.indexOf('function sectionsHtml('),html.indexOf('const timelineCache =')),timeline);
+ vm.runInContext(appSource.slice(appSource.indexOf('function sectionsHtml('),appSource.indexOf('const timelineCache =')),timeline);
  const messages=[{period:5,key:'last'},{period:0,key:'first'},{period:2,key:'income'},{period:2,key:'disaster'}];
  const result=timeline.sectionsHtml(messages,true,8);
  assert.equal(result.total,8);
@@ -182,7 +183,7 @@ test('playhead moves one persistent marker and honors reduced-motion scrolling',
   requestAnimationFrame:callback=>{callback();return 1;},cancelAnimationFrame(){},
   document:{querySelector:()=>({offsetHeight:100})},matchMedia:()=>({matches:true})
  });
- vm.runInContext(html.slice(html.indexOf('let mountedTimelineKey ='),html.indexOf('const timelineCache =')),timeline);
+ vm.runInContext(appSource.slice(appSource.indexOf('let mountedTimelineKey ='),appSource.indexOf('const timelineCache =')),timeline);
  timeline.syncPlayhead();
  assert.equal(marker.style.transform,'translateY(500px)');
  assert.equal(marker.hidden,false);
@@ -193,4 +194,51 @@ test('playhead moves one persistent marker and honors reduced-motion scrolling',
  timeline.period=2;timeline.syncPlayhead();
  assert.equal(body.scrolled,null);
  assert.equal(attrs['aria-current'],undefined);
+});
+
+function selectionContext() {
+ const homes=[
+  {id:1,owner:7,resident:9,destroyed:false},
+  {id:2,owner:7,resident:null,destroyed:true},
+  {id:3,owner:9,resident:7,destroyed:false},
+ ];
+ const c=vm.createContext({
+  frames:[{homes}],period:0,homeId:null,selectedKind:'person',selectedId:null,
+  panelTab:'overview',worldName:'Standard',shape:[1,3],blocks:[],
+  spots:new Map(homes.map((h,i)=>[h.id,{x:i,y:0,w:1,h:1}])),
+  render(){},stopPlay(){},hideTip(){},$(){return {scrollTop:0};}
+ });
+ for(const [start,end] of [
+  ['function clearSelection(', 'document\n'],
+  ['function setTab(', 'const worldBlurbs ='],
+  ['function miniMap(', 'atlasPlates.forEach('],
+ ]) {
+  const offset=appSource.indexOf(start);
+  vm.runInContext(appSource.slice(offset,appSource.indexOf(end,offset)),c);
+ }
+ return c;
+}
+
+test('home selection follows its owner, including rented and destroyed homes, from any tab',()=>{
+ const c=selectionContext();
+ for(const tab of ['overview','timeline','people']){
+  c.panelTab=tab;c.selectHome(1);
+  assert.equal(c.homeId,1);assert.equal(c.selectedId,7);assert.equal(c.panelTab,'people');
+ }
+ c.selectHome(2);
+ assert.equal(c.selectedId,7);assert.equal(c.homeId,2);
+ c.selectHome(999);
+ assert.equal(c.homeId,2);
+});
+
+test('selection survives panel changes and highlights all owned homes in research previews',()=>{
+ const c=selectionContext();c.selectHome(1);c.setTab('timeline');
+ assert.equal(c.selectedId,7);assert.equal(c.homeId,1);
+ const html=c.miniMap(c.frames[0].homes,()=>({bg:'#fff'}));
+ assert.equal((html.match(/class="mini-owned"/g)||[]).length,2);
+ assert.ok(html.includes('data-home="2"'));
+ assert.equal((c.miniMap(c.frames[0].homes,()=>({bg:'#fff'}),'Chaos').match(/class="mini-owned"/g)||[]).length,0);
+ c.clearSelection();
+ assert.equal(c.homeId,null);assert.equal(c.selectedId,null);
+ assert.equal((c.miniMap(c.frames[0].homes,()=>({bg:'#fff'})).match(/class="mini-owned"/g)||[]).length,0);
 });

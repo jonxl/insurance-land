@@ -265,3 +265,10 @@ _minted*/
 
 # Local saved experiments
 /studies/webui/runs/
+
+# Browser development dependencies
+/node_modules/
+
+# Ship compiled browser assets so Python commands need no Node installation
+!/experiments/ui/dist/
+!/experiments/ui/dist/*.js

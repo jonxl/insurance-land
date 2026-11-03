@@ -1,2 +1,4 @@
 # Generated study pages, recordings, and report figures.
 studies/webui/** linguist-generated=true
+
+experiments/ui/dist/** linguist-generated=true

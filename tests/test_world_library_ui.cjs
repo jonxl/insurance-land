@@ -1,11 +1,12 @@
-const {test}=require('node:test');
+const {test}=require('bun:test');
 const assert=require('node:assert/strict');
 const {readFileSync}=require('node:fs');
 const vm=require('node:vm');
-const html=readFileSync('experiments/diagnostics.html','utf8');
-const source=html.slice(html.indexOf("let view = 'map'"),html.indexOf("let chartView ="));
+const appSource=readFileSync('experiments/ui/dist/app.js','utf8');
+const source=appSource.slice(appSource.indexOf("let view = 'map'"),appSource.indexOf("let chartView ="));
 function setup(fetch){
  const nodes=new Map();
+ const timers=new Map(), listeners={}; let timerId=0;
  function element(){
   return {hidden:false,disabled:false,children:[],attributes:{},dataset:{},value:'',textContent:'',
    append(...nodes){this.children.push(...nodes);},
@@ -21,14 +22,14 @@ function setup(fetch){
  const config={name:'Standard',seed:42,rows:8,columns:8,periods:120,rate:.1};
  const location={protocol:'http:',pathname:'/diagnostics.html',search:'',replace(url){this.replaced=url;}};
  const context=vm.createContext({
-  $,bundle:{},document:{createElement:element},worlds:{Standard:{configuration:config}},worldName:'Standard',
+  $,bundle:{},document:{createElement:element,hidden:false,addEventListener(name,listener){listeners[name]=listener;}},worlds:{Standard:{configuration:config}},worldName:'Standard',
   window:{addEventListener(){}},location,history:{pushState(a,b,url){location.search=url.startsWith('?')?url:'';},replaceState(a,b,url){location.search=url.startsWith('?')?url:'';}},
   hideTip(){},stopPlay(){},renderResearch(){},render(){},setWorld(){},
-  fetch,clearTimeout(){},setTimeout(){return 1;},URLSearchParams,encodeURIComponent,
+  fetch,clearTimeout(id){timers.delete(id);},setTimeout(callback){timers.set(++timerId,callback);return timerId;},URLSearchParams,encodeURIComponent,
   FormData:class{constructor(form){return Object.entries(form.values);}}
  });
  vm.runInContext(source,context);
- return {context,$,location,config};
+ return {context,$,location,config,timers,listeners};
 }
 const response=body=>({ok:true,json:async()=>body});
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
@@ -152,4 +153,51 @@ test('Chaos growth controls only apply to Chaos experiments',()=>{
  app.$('input:name').value='Chaos';app.context.syncExperimentType();
  assert.equal(app.$('chaosRateControl').hidden,false);
  assert.equal(app.$('input:chaos_rate_ratio').disabled,false);
+});
+
+
+test('idle libraries stop polling, including completed and failed runs',async()=>{
+ for(const states of [[],['complete','failed']]){
+  const app=setup(async url=>response(url==='/api/health'?{ready:true}:{runs:states.map(state=>({id:state,state,title:state,configuration:app.config}))}));
+  await app.context.initializeLibrary();await flush();
+  assert.equal(app.timers.size,0);
+ }
+});
+
+test('library polls active runs and stops after completion',async()=>{
+ let state='running';
+ const app=setup(async url=>response(url==='/api/health'?{ready:true}:{runs:[{id:'job',state,title:'Job',configuration:app.config}]}));
+ await app.context.initializeLibrary();await flush();
+ assert.equal(app.timers.size,1);
+ state='complete';
+ await app.context.refreshLibrary();
+ assert.equal(app.timers.size,0);
+});
+
+test('library requests cannot overlap',async()=>{
+ let resolve, requests=0;
+ const app=setup(()=>{requests++;return new Promise(done=>{resolve=done;});});
+ app.context.showView('start');
+ const first=app.context.refreshLibrary();
+ await app.context.refreshLibrary();
+ assert.equal(requests,1);
+ resolve(response({runs:[]}));await first;
+ assert.equal(app.timers.size,0);
+});
+
+test('library pauses when hidden and refreshes on return; leaving cancels its timer',async()=>{
+ let requests=0;
+ const app=setup(async url=>{
+  if(url==='/api/health')return response({ready:true});
+  requests++;return response({runs:[{id:'job',state:'queued',title:'Job',configuration:app.config}]});
+ });
+ await app.context.initializeLibrary();await flush();
+ assert.equal(app.timers.size,1);
+ app.context.document.hidden=true;app.listeners.visibilitychange();
+ assert.equal(app.timers.size,0);
+ const before=requests;await app.context.refreshLibrary();assert.equal(requests,before);
+ app.context.document.hidden=false;app.listeners.visibilitychange();await flush();
+ assert.equal(requests,before+1);assert.equal(app.timers.size,1);
+ app.context.showView('map');assert.equal(app.timers.size,0);
+ await app.context.refreshLibrary();assert.equal(requests,before+1);
 });

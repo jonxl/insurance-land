@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from experiments.diagnostic_fields import diagnostic_fields
 from experiments.recording import WorldRecorder
+from experiments.viewer import VIEWER_ASSETS, VIEWER_TEMPLATE, export_viewer
 from experiments.worlds import WorldSpec
 
 
@@ -62,10 +63,7 @@ def run_experiment(
     serialized = json.dumps({"worlds": {spec.name: data}, "default": spec.name, "title": title})
     (output / "assets").mkdir(parents=True, exist_ok=True)
     (output / "assets/world-history.json").write_text(serialized)
-    template = Path(__file__).with_name("diagnostics.html").read_text()
-    (output / "diagnostics.html").write_text(
-        template.replace("__WORLD_DATA__", serialized.replace("<", "\\u003c"))
-    )
+    export_viewer(output)
 
 
 class RunLibrary:
@@ -174,9 +172,26 @@ def make_handler(root: Path) -> type[SimpleHTTPRequestHandler]:
             self.end_headers()
             self.wfile.write(body)
 
+        def browser_file(self, source: Path) -> None:
+            content_type = {
+                ".html": "text/html; charset=utf-8",
+                ".css": "text/css; charset=utf-8",
+                ".js": "text/javascript; charset=utf-8",
+            }[source.suffix]
+            body = source.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
         def do_GET(self) -> None:
             path = urlsplit(self.path).path
-            if path == "/api/health":
+            asset_name = path.rpartition("/ui/")[2] if "/ui/" in path else None
+            if asset_name in VIEWER_ASSETS:
+                self.browser_file(VIEWER_ASSETS[asset_name])
+            elif path == "/api/health":
                 self.reply(200, {"ready": True})
             elif path == "/api/runs":
                 self.reply(200, {"runs": library.list()})
@@ -190,16 +205,7 @@ def make_handler(root: Path) -> type[SimpleHTTPRequestHandler]:
                     page = Path(self.translate_path(urlsplit(self.path).path))
                     recording = page.parent / "assets/world-history.json"
                     if recording.is_file():
-                        template = Path(__file__).with_name("diagnostics.html").read_text()
-                        body = template.replace(
-                            "__WORLD_DATA__", recording.read_text().replace("<", "\\u003c"),
-                        ).encode()
-                        self.send_response(200)
-                        self.send_header("Content-Type", "text/html; charset=utf-8")
-                        self.send_header("Content-Length", str(len(body)))
-                        self.send_header("Cache-Control", "no-store")
-                        self.end_headers()
-                        self.wfile.write(body)
+                        self.browser_file(VIEWER_TEMPLATE)
                         return
                 super().do_GET()
 
