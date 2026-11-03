@@ -2,7 +2,9 @@
 
 import argparse
 import json
+from collections.abc import Callable
 from dataclasses import asdict
+from datetime import UTC, datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock, Thread
@@ -44,14 +46,21 @@ def parse_spec(values: dict) -> WorldSpec:
     return spec
 
 
-def run_experiment(spec: WorldSpec, output: Path) -> None:
+def run_experiment(
+    spec: WorldSpec, output: Path, progress: Callable[[int, str], None] | None = None,
+    *, title: str | None = None,
+) -> None:
     recorder = WorldRecorder(spec.create())
-    for rate in spec.rates():
+    for period, rate in enumerate(spec.rates(), 1):
         recorder.step(disaster_rate=rate)
+        if progress:
+            progress(period, "Simulating")
+    if progress:
+        progress(spec.periods, "Preparing snapshots")
     data = recorder.data()
     data.update(configuration=asdict(spec), rates=spec.rates(), diagnostics=diagnostic_fields(spec))
-    serialized = json.dumps({"worlds": {spec.name: data}, "default": spec.name})
-    (output / "assets").mkdir(parents=True)
+    serialized = json.dumps({"worlds": {spec.name: data}, "default": spec.name, "title": title})
+    (output / "assets").mkdir(parents=True, exist_ok=True)
     (output / "assets/world-history.json").write_text(serialized)
     template = Path(__file__).with_name("diagnostics.html").read_text()
     (output / "diagnostics.html").write_text(
@@ -59,18 +68,98 @@ def run_experiment(spec: WorldSpec, output: Path) -> None:
     )
 
 
-def make_handler(root: Path) -> type[SimpleHTTPRequestHandler]:
-    jobs: dict[str, dict] = {}
-    lock = Lock()
+class RunLibrary:
+    """Persist saved worlds and serialize simulation work in the background."""
 
-    def execute(job_id: str, spec: WorldSpec) -> None:
-        try:
-            run_experiment(spec, root / "runs" / job_id)
-            result = {"state": "complete", "url": f"/runs/{job_id}/diagnostics.html"}
-        except Exception as error:
-            result = {"state": "failed", "error": str(error)}
-        with lock:
-            jobs[job_id] = result
+    def __init__(self, root: Path):
+        self.root = root
+        self.lock = Lock()
+        self.worker_lock = Lock()
+        self.jobs: dict[str, dict] = {}
+        for directory in sorted((root / "runs").glob("*")):
+            if not directory.is_dir():
+                continue
+            manifest = directory / "run.json"
+            try:
+                if manifest.exists():
+                    job = json.loads(manifest.read_text())
+                else:
+                    bundle = json.loads((directory / "assets/world-history.json").read_text())
+                    config = bundle["worlds"][bundle["default"]]["configuration"]
+                    job = {
+                        "id": directory.name, "title": f'{config["name"]} experiment',
+                        "configuration": config, "state": "complete",
+                        "completed_periods": config["periods"],
+                        "created_at": datetime.fromtimestamp(
+                            directory.stat().st_mtime, UTC,
+                        ).isoformat(),
+                    }
+                job["id"] = directory.name
+                job["url"] = f"/runs/{directory.name}/diagnostics.html?view=map"
+                if job["state"] in ("running", "queued"):
+                    job.update(
+                        state="failed", error="The server stopped before this experiment finished.",
+                    )
+                self.jobs[directory.name] = job
+                self._save(job)
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
+
+    def _save(self, job: dict) -> None:
+        directory = self.root / "runs" / job["id"]
+        directory.mkdir(parents=True, exist_ok=True)
+        temporary = directory / "run.json.tmp"
+        temporary.write_text(json.dumps(job))
+        temporary.replace(directory / "run.json")
+
+    def update(self, job_id: str, **changes) -> None:
+        with self.lock:
+            self.jobs[job_id].update(changes)
+            self._save(self.jobs[job_id])
+
+    def list(self) -> list[dict]:
+        with self.lock:
+            return sorted(
+                (dict(job) for job in self.jobs.values()),
+                key=lambda job: job["created_at"], reverse=True,
+            )
+
+    def get(self, job_id: str) -> dict | None:
+        with self.lock:
+            return dict(self.jobs[job_id]) if job_id in self.jobs else None
+
+    def create(self, spec: WorldSpec, title: str) -> dict:
+        job_id = uuid4().hex
+        job = {
+            "id": job_id, "title": title or f"{spec.name} experiment",
+            "configuration": asdict(spec), "state": "queued", "completed_periods": 0,
+            "stage": "Waiting to start", "created_at": datetime.now(UTC).isoformat(),
+            "url": f"/runs/{job_id}/diagnostics.html?view=map",
+        }
+        with self.lock:
+            self.jobs[job_id] = job
+            self._save(job)
+        Thread(target=self.execute, args=(job_id, spec), daemon=True).start()
+        return dict(job)
+
+    def execute(self, job_id: str, spec: WorldSpec) -> None:
+        with self.worker_lock:
+            try:
+                self.update(job_id, state="running", stage="Creating experiment")
+                run_experiment(
+                    spec, self.root / "runs" / job_id,
+                    lambda period, stage: self.update(
+                        job_id, completed_periods=period, stage=stage,
+                    ),
+                    title=self.get(job_id)["title"],
+                )
+                self.update(job_id, state="complete", stage="Ready to explore")
+            except Exception as error:
+                self.update(job_id, state="failed", error=str(error))
+
+
+def make_handler(root: Path) -> type[SimpleHTTPRequestHandler]:
+    library = RunLibrary(root)
 
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -89,13 +178,29 @@ def make_handler(root: Path) -> type[SimpleHTTPRequestHandler]:
             path = urlsplit(self.path).path
             if path == "/api/health":
                 self.reply(200, {"ready": True})
+            elif path == "/api/runs":
+                self.reply(200, {"runs": library.list()})
             elif path.startswith("/api/runs/"):
-                with lock:
-                    job = jobs.get(path.rsplit("/", 1)[-1])
+                job = library.get(path.rsplit("/", 1)[-1])
                 self.reply(200 if job else 404, job or {"error": "Run not found"})
             else:
                 if path == "/":
                     self.path = "/diagnostics.html"
+                if urlsplit(self.path).path.endswith("/diagnostics.html"):
+                    page = Path(self.translate_path(urlsplit(self.path).path))
+                    recording = page.parent / "assets/world-history.json"
+                    if recording.is_file():
+                        template = Path(__file__).with_name("diagnostics.html").read_text()
+                        body = template.replace(
+                            "__WORLD_DATA__", recording.read_text().replace("<", "\\u003c"),
+                        ).encode()
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/html; charset=utf-8")
+                        self.send_header("Content-Length", str(len(body)))
+                        self.send_header("Cache-Control", "no-store")
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
                 super().do_GET()
 
         def do_POST(self) -> None:
@@ -114,21 +219,15 @@ def make_handler(root: Path) -> type[SimpleHTTPRequestHandler]:
                 values = json.loads(self.rfile.read(length))
                 if not isinstance(values, dict):
                     raise ValueError("Expected a configuration object")
+                title = values.pop("title", "")
+                if not isinstance(title, str) or len(title) > 80:
+                    raise ValueError("Experiment name must be at most 80 characters")
                 spec = parse_spec(values)
             except (ValueError, TypeError) as error:
                 self.reply(400, {"error": str(error)})
                 return
-            with lock:
-                if any(job["state"] == "running" for job in jobs.values()):
-                    self.reply(
-                        409,
-                        {"error": "An experiment is already running. Try again when it finishes."},
-                    )
-                    return
-                job_id = uuid4().hex
-                jobs[job_id] = {"state": "running"}
-            Thread(target=execute, args=(job_id, spec), daemon=True).start()
-            self.reply(202, {"id": job_id, "state": "running"})
+            job = library.create(spec, title.strip())
+            self.reply(202, job)
 
     return Handler
 

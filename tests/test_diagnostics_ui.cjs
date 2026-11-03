@@ -7,7 +7,7 @@ const context=vm.createContext({});
 vm.runInContext(html.slice(html.indexOf('function metricValues('),html.indexOf('function diagnosticPlot(')),context);
 const {distribution,metricValues,ranks}=context;
 
-vm.runInContext(html.slice(html.indexOf('function treemap('),html.indexOf('const regionMembers=')),context);
+vm.runInContext(html.slice(html.indexOf('function treemap('),html.indexOf('const regionMembers =')),context);
 test('treemap sizes blocks by home count, fills the map and keeps grid order',()=>{
  const items=[[0,0,6],[0,1,2],[1,0,1],[1,1,7]].map(([row,col,count])=>({row,col,count}));
  const blocks=context.treemap(items,0,0,2,2);
@@ -59,7 +59,7 @@ test('histogram preserves all observations including the maximum and zero-only s
  assert.equal(context.histogramBins([0,0,0]).counts[0],3);
 });
 
-vm.runInContext(html.slice(html.indexOf('const personColors='),html.indexOf('const shape=')),context);
+vm.runInContext(html.slice(html.indexOf('const personColors ='),html.indexOf('const shape =')),context);
 test('person colors are stable, colorful, unique, and separated from firm colors',()=>{
  const colors=Array.from({length:1024},(_,i)=>context.ownerColor(i+1));
  assert.equal(new Set(colors).size,1024);
@@ -80,7 +80,7 @@ test('person colors stay out of the purple hues reserved for disasters',()=>{
  }
 });
 
-vm.runInContext('const money=n=>"$"+Number(n);const firmName=id=>"Firm "+id;'+html.slice(html.indexOf('function buildLog('),html.indexOf('const logCache=')),context);
+vm.runInContext('const money=n=>"$"+Number(n);const firmName=id=>"Firm "+id;'+html.slice(html.indexOf('function buildLog('),html.indexOf('const logCache =')),context);
 test('console log records collapses, disasters, claims, and unpaid rent',()=>{
  const firm=capital=>[{id:1,capital}];
  const log=context.buildLog([
@@ -126,4 +126,71 @@ test('claim wording says when an insurer paid nothing or only part',()=>{
  assert.match(claim('10','0'),/^Firm 1 paid a claim/);
  assert.match(claim('4','6'),/^Firm 1 partly paid/);
  assert.match(claim('0','10'),/^Firm 1 could not pay/);
+});
+
+test('combined timeline puts payments before disasters and keeps claims under their event',()=>{
+ const frames=[
+  {firms:[{id:1,capital:'100'}],events:[],transfers:[{kind:'premium',person:1,firm:1,home:1,amount:'10'}]},
+  {firms:[{id:1,capital:'0'}],events:[{id:1,cells:[[0,0]],losses:[1],displaced:[1]}],transfers:[
+   {kind:'income',person:1,amount:'20'},
+   {kind:'rent',person:1,recipient:2,home:1,paid:true,amount:'5'},
+   {kind:'claim',firm:1,person:1,home:1,due:'100',amount:'100',shortfall:'0'}
+  ]}
+ ];
+ const events=context.timelineEvents(frames);
+ assert.deepEqual(Array.from(events,e=>e.key),['ledger:0:premium','ledger:1:income','ledger:1:rent','disaster:1:1','capital:1:1']);
+ const claims=events.flatMap(e=>e.replies||[]).filter(r=>r.title.includes('paid a claim'));
+ assert.equal(claims.length,1);
+});
+
+test('timeline preserves claims without a linked disaster',()=>{
+ const events=context.timelineEvents([{firms:[],events:[],transfers:[
+  {kind:'claim',firm:1,person:1,home:1,due:'10',amount:'10',shortfall:'0'}
+ ]}]);
+ assert.equal(events.length,1);
+ assert.equal(events[0].key,'other-claims:0');
+ assert.equal(events[0].replies.length,1);
+});
+
+test('full timeline contains every recorded stop and stays unchanged when the period moves',()=>{
+ const timeline=vm.createContext({period:0,messageHtml:m=>m.key});
+ vm.runInContext(html.slice(html.indexOf('function sectionsHtml('),html.indexOf('const timelineCache =')),timeline);
+ const messages=[{period:5,key:'last'},{period:0,key:'first'},{period:2,key:'income'},{period:2,key:'disaster'}];
+ const result=timeline.sectionsHtml(messages,true,8);
+ assert.equal(result.total,8);
+ assert.ok(result.html.indexOf('Period 0')<result.html.indexOf('Period 2'));
+ assert.ok(result.html.indexOf('>income<')<result.html.indexOf('>disaster<'));
+ assert.match(result.html,/Period 5/);
+ assert.match(result.html,/Period 7/);
+ assert.match(result.html,/No disasters this period/);
+ timeline.period=5;
+ assert.equal(timeline.sectionsHtml(messages,true,8).html,result.html);
+ assert.equal(timeline.sectionsHtml([],true,3).total,3);
+ assert.equal(timeline.sectionsHtml([],true,0).html,'');
+});
+
+test('playhead moves one persistent marker and honors reduced-motion scrolling',()=>{
+ const marker={style:{},hidden:true},note={hidden:true},attrs={};
+ const node={getBoundingClientRect:()=>({top:600,bottom:614})};
+ const stop={dataset:{jump:'3'},setAttribute:(k,v)=>attrs[k]=v,removeAttribute:k=>delete attrs[k],querySelector:selector=>selector==='.period-node'?node:note};
+ const route={getBoundingClientRect:()=>({top:100}),querySelector:()=>marker,querySelectorAll:selector=>selector==='[data-jump]'?[stop]:[]};
+ const feed={querySelector:selector=>selector==='.timeline-route'?route:stop};
+ const body={scrollTop:0,getBoundingClientRect:()=>({top:0,bottom:400}),scrollTo:options=>body.scrolled=options};
+ const elements={feed,panelBody:body,feedPanel:{hidden:false},snapshotView:{hidden:false},snapshotMap:{hidden:false},followTimeline:{checked:true}};
+ const timeline=vm.createContext({
+  period:3,focusEvent:null,$:id=>elements[id],
+  requestAnimationFrame:callback=>{callback();return 1;},cancelAnimationFrame(){},
+  document:{querySelector:()=>({offsetHeight:100})},matchMedia:()=>({matches:true})
+ });
+ vm.runInContext(html.slice(html.indexOf('let mountedTimelineKey ='),html.indexOf('const timelineCache =')),timeline);
+ timeline.syncPlayhead();
+ assert.equal(marker.style.transform,'translateY(500px)');
+ assert.equal(marker.hidden,false);
+ assert.equal(attrs['aria-current'],'step');
+ assert.equal(note.hidden,false);
+ assert.equal(body.scrolled.behavior,'instant');
+ elements.followTimeline.checked=false;body.scrolled=null;
+ timeline.period=2;timeline.syncPlayhead();
+ assert.equal(body.scrolled,null);
+ assert.equal(attrs['aria-current'],undefined);
 });
