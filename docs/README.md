@@ -1,6 +1,6 @@
 # Insurance Land documentation
 
-Insurance Land is a Python simulation foundation for a market of people, homes, and decision-making agents. Factories build the initial population, an `Environment` connects its objects, and `main.py` advances the simulation through a sequence of periods.
+Insurance Land is a Python simulation foundation for a market of people, homes, and decision-making agents. Factories build the initial population, an `Environment` connects its objects, and the command center runs and records experiments. `main.py` provides a small terminal demonstration.
 
 Each person has an individual budget, a single-person household, and a `HouseAgent`. A home records its owner and its optional resident separately. Rent is a behavior of the house agent, with payment settlement handled by the economic model.
 
@@ -9,7 +9,7 @@ Each person has an individual budget, a single-person household, and a `HouseAge
 | Document | What it explains |
 | --- | --- |
 | [Initial distributions](initial-distributions.md) | Seeded grids, Lorenz allocations, disasters, and insurance experiments |
-| [Getting started](getting-started.md) | uv setup, running the main loop, and inspecting a small simulation |
+| [Getting started](getting-started.md) | uv setup, the command center, saved experiments, and a small simulation |
 | [Architecture](architecture.md) | Directory layout, responsibilities, relationships, and state management |
 | [Domain model](domain-model.md) | People, households, regions, homes, money, and housing operations |
 | [Factories](factories.md) | Configuration, seeded population generation, explicit scenarios, and agent creation |
@@ -25,10 +25,10 @@ From the repository root:
 
 ```bash
 uv sync --locked
-uv run python main.py
+uv run python -m experiments.command_center
 ```
 
-The entry point creates a 4-by-4 grid with 16 people and three insurers, opens coverage, then runs three periods with disaster exposure. See [initial distributions](initial-distributions.md) for configuration and the explicit toy contract rules.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000) to run and inspect experiments. The [getting-started guide](getting-started.md) covers server options and saved recordings. For the small three-period terminal example, run `uv run python main.py`. See [initial distributions](initial-distributions.md) for configuration and the explicit toy contract rules.
 
 ## Core relationships
 

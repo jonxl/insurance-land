@@ -4,7 +4,7 @@
 
 ```text
 insurance-land/
-├── main.py                # Experiment runner
+├── main.py                # Terminal demonstration
 ├── environment.py         # Simulation orchestration
 ├── agents/                # Policy interfaces and baselines
 ├── domain/                # Housing, insurance, disasters, and records
@@ -12,6 +12,9 @@ insurance-land/
 ├── utils/
 │   ├── distributions.py   # Reusable mathematical generators
 │   └── validation/
+├── experiments/           # Presets, command center, recording, and reports
+├── studies/webui/         # Generated reference pages and figures
+│   └── runs/              # Saved experiment configurations and recordings
 ├── tests/
 ├── docs/
 ├── plans/
@@ -19,13 +22,18 @@ insurance-land/
 └── uv.lock
 ```
 
-`main.py` runs experiments. Root-level packages group code by responsibility, with imports such as `from factories import EnvironmentFactory`.
+`experiments.command_center` serves the local experiment workspace and runs simulations in the background. `main.py` runs a small terminal demonstration. Root-level packages group code by responsibility, with imports such as `from factories import EnvironmentFactory`.
 
 ## Responsibilities
 
 | Module | Responsibility |
 | --- | --- |
 | [main.py](../main.py) | Choose an experiment configuration, construct the environment, run periods, and report results |
+| [experiments/command_center.py](../experiments/command_center.py) | Serve the workspace, queue simulations, persist progress, and reopen saved experiments |
+| [experiments/worlds.py](../experiments/worlds.py) | Define Peace, Standard, and Chaos configurations and rate schedules |
+| [experiments/recording.py](../experiments/recording.py) | Capture period snapshots for maps, charts, and event history |
+| [experiments/diagnostics.html](../experiments/diagnostics.html) | Source template for the interactive experiment views |
+| [experiments/generate_worlds.py](../experiments/generate_worlds.py) | Generate reference recordings and reports under `studies/webui` |
 | [environment.py](../environment.py) | Assemble related objects, expose observations, collect decisions, validate actions, and commit each period |
 | [domain/models.py](../domain/models.py) | Define economic records and validate their local values |
 | [domain/housing.py](../domain/housing.py) | Maintain people and homes, enforce housing relationships, and apply economic changes |
@@ -35,6 +43,8 @@ insurance-land/
 | [factories/population.py](../factories/population.py) | Generate an initial scenario from population parameters and a seed |
 | [factories/environment.py](../factories/environment.py) | Attach a separate house agent to each person and construct the environment |
 | [utils/validation](../utils/validation/) | Share money validation and unique-ID indexing helpers |
+
+The command center serves the current HTML template with a recording's data. Generated HTML files embed the same snapshot data for inspection. Saved runs live under the served directory's `runs/<id>/`; their manifests retain configuration and status across server restarts. See [saved experiments](getting-started.md#saved-experiments).
 
 ## Construction and execution flow
 

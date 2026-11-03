@@ -1,6 +1,6 @@
 # Initial distributions and insurance experiments
 
-The initial-distributions model now has a reusable implementation. Its records remain in `domain`, construction in `factories`, decisions in `agents`, and pure mathematical helpers in `utils/distributions.py`. It uses the standard library and `Decimal` money; no numerical or learning-library dependency is required.
+The initial-distributions model now has a reusable implementation. Its records remain in `domain`, construction in `factories`, decisions in `agents`, and pure mathematical helpers in `utils/distributions.py`. It uses NumPy for numerical sampling and spatial fields, and `Decimal` for money. The baseline policies do not require a learning library.
 
 Run the example from the repository root:
 
@@ -9,6 +9,20 @@ uv run python main.py
 ```
 
 The example creates a 4-by-4 grid, 16 people, and three insurers. Its fixed quoting and cheapest-affordable purchasing policies demonstrate the interfaces; they are not trained agents.
+
+## Command-center experiment presets
+
+The [command center](getting-started.md#run-the-command-center) runs the presets in [experiments/worlds.py](../experiments/worlds.py). Saved experiments have a user-facing name and a separate Peace, Standard, or Chaos type. The included recordings are named Dev Peace, Dev Standard, and Dev Chaos.
+
+| Type | Initial conditions | Default expected disasters per period |
+| --- | --- | --- |
+| Peace | Equal income, one owner-occupied home per person, equal cash, and identical prices; disaster exposure still varies spatially | Constant 0.5 |
+| Standard | Unequal income and ownership, spatially varying prices, and income-based residence placement | Constant 0.1 |
+| Chaos | The same initial population, ownership, prices, and hidden risk as Standard | Exponential growth with a mean of 0.5 across the run |
+
+For Chaos, the final rate is ten times the initial rate by default when there are at least two periods. The configured rate is the mean over the run, not the initial rate. Realized disaster counts are random and need not increase every period. At 120 periods, Standard expects 12 events, while Peace and Chaos each expect 60.
+
+Command-center presets use a spatial risk field and sampled disaster sizes: the radius in neighborhoods is the integer part of a Tweedie sample, with default mean 0.3 and dispersion 1.5. Radius zero still affects the anchor neighborhood. This differs from the fixed rectangular footprint in the example below.
 
 ## Generate a reproducible population
 
@@ -73,7 +87,7 @@ for event in result.disasters:
 environment.step(disaster_rate=2.0)
 ```
 
-The rate is expected events per simulation period. Each event uniformly selects an eligible top-left position for a fixed rectangle fully contained in the grid. There is no edge clipping or wrapping, so the affected cell count is fixed. Overlap is allowed; already destroyed homes do not generate another building loss.
+The rate is expected events per simulation period. In this fixed-footprint example, each event uniformly selects an eligible top-left position for a fixed rectangle fully contained in the grid. There is no edge clipping or wrapping, so the affected cell count is fixed. Overlap is allowed; already destroyed homes do not generate another building loss.
 
 The working market sets destroyed homes' value and rent to zero, clears their resident, and retains their owner and location. `DisasterResult.losses` contains immutable pre-loss `Home` records for newly destroyed homes. Displaced people remain in the population and continue receiving income; attempting to move into a destroyed home is rejected. Rebuilding and relocation policies are not yet modeled.
 

@@ -38,6 +38,28 @@ Configuration lives in [pyproject.toml](../pyproject.toml). Ruff targets Python 
 
 pytest discovers tests in `tests/`, adds the repository root to the import path, and enables strict configuration and marker checking.
 
+## Command-center development
+
+Edit [experiments/diagnostics.html](../experiments/diagnostics.html), the source template, rather than a generated recording page. The local command center serves that template with the selected recording's data, so refreshing picks up template changes. Restart the server after changing Python code.
+
+Run the command-center checks and JavaScript interaction tests from the repository root. The JavaScript tests require Node.js and use its built-in test runner:
+
+```bash
+uv run pytest tests/test_command_center.py tests/test_worlds.py -q
+node tests/test_diagnostics_ui.cjs
+node tests/test_world_library_ui.cjs
+```
+
+These cover saved runs, progress, presets, experiment navigation, and timeline behavior. They do not replace browser checks of layout or animation.
+
+[.prettierrc.json](../.prettierrc.json) configures HTML and embedded CSS/JavaScript formatting with two-space indentation and a 100-character print width. With Node.js and npm available:
+
+```bash
+npx prettier@3.8.2 --write experiments/diagnostics.html
+```
+
+[.prettierignore](../.prettierignore) excludes generated recording pages because their embedded datasets are large. Generate distributable reference pages and figures from the source with `uv run python -m experiments.generate_worlds`; see [regeneration instructions](getting-started.md#regenerate-reference-recordings-and-figures).
+
 ## Dependency management
 
 Use uv for dependency changes. Add application dependencies with `uv add <package>` and development tools with `uv add --dev <package>`. Keep `pyproject.toml` and `uv.lock` together when dependency requirements change.
